@@ -65,7 +65,8 @@ describe('projectService permission checks', () => {
     Project.create.mockResolvedValue({ id: 'project-1' });
     Task.create.mockResolvedValue({ id: 'task-1' });
 
-    const result = await svc.updateQuoteStatus('quote-1', 'aceptada', 'admin-1');
+    // Firma vigente: (quoteId, status, estimatedPrice, user, io)
+    const result = await svc.updateQuoteStatus('quote-1', 'aceptada', null, { id: 'admin-1', role: 'admin' });
 
     expect(Project.create).toHaveBeenCalled();
     expect(Task.create).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'project-1', created_by: 'admin-1' }));

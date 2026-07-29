@@ -22,19 +22,20 @@ const app = express();
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: process.env.NODE_ENV === 'production'
+    ? (process.env.FRONTEND_URL || '').split(',').map(u => u.trim()).filter(Boolean)
+    : true,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-const globalLimiter = rateLimit({ 
-  windowMs: 15 * 60 * 1000, 
-  max: process.env.NODE_ENV === 'development' ? 5000 : 100, 
-  standardHeaders: true, 
-  legacyHeaders: false 
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: process.env.NODE_ENV === 'development' ? 5_000 : 100,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10, message: { success: false, message: 'Demasiados intentos' }, skip: () => process.env.NODE_ENV === 'development' });
 app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -47,7 +48,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.get('/health', (req, res) => res.json({ success: true, service: 'HOME API', version: '1.0.0', timestamp: new Date().toISOString() }));
 
 // Rutas
-app.use('/api/auth', authLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/tasks', tasksRoutes);

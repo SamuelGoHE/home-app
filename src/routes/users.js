@@ -1,7 +1,9 @@
 const express = require('express');
 const { Op, fn, col, literal } = require('sequelize');
+const { sequelize } = require('../config/database');
 const { User, WorkerProfile, Rating, Project } = require('../models');
 const { authenticate, authorize } = require('../middlewares/auth');
+const { revokeAllRefreshTokens, blacklistAccessToken } = require('../utils/jwt');
 const router = express.Router();
 
 // Obtener un usuario por email (solo admin)
@@ -28,10 +30,12 @@ router.get('/workers', authenticate, async (req, res, next) => {
     let includeWhere = {};
 
     if (city) {
-      // Buscar si vive en la ciudad O si la cubre en su perfil
+      // Buscar si vive en la ciudad O si la cubre en su perfil.
+      // sequelize.escape() cita y escapa el valor → previene inyección SQL.
+      const safeCity = sequelize.escape(city);
       whereClause[Op.or] = [
         { city: city },
-        literal(`EXISTS (SELECT 1 FROM worker_profiles WHERE worker_profiles.user_id = "User"."id" AND '${city}' = ANY(worker_profiles.cities_covered))`)
+        literal(`EXISTS (SELECT 1 FROM worker_profiles WHERE worker_profiles.user_id = "User"."id" AND ${safeCity} = ANY(worker_profiles.cities_covered))`)
       ];
     }
     if (specialty) {
@@ -118,7 +122,7 @@ router.get('/workers/:id', authenticate, async (req, res, next) => {
       where: {
         status: 'completado',
         // Buscamos proyectos donde el worker aparezca en alguna tarea
-        '$tasks.assigned_user_id$': id
+        '$tasks.assigned_to$': id
       },
       include: [{ association: 'tasks', attributes: [] }],
       distinct: true
@@ -139,6 +143,36 @@ router.get('/workers/:id', authenticate, async (req, res, next) => {
     next(error);
   }
 });
+// Actualizar datos personales del usuario autenticado
+router.patch('/me', authenticate, async (req, res, next) => {
+  try {
+    const { name, email, phone, city } = req.body;
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+
+    // Si cambia el email, verificar que no esté en uso
+    if (email && email !== user.email) {
+      const existing = await User.findOne({ where: { email } });
+      if (existing) {
+        return res.status(400).json({ success: false, message: 'Ese correo ya está registrado' });
+      }
+    }
+
+    await user.update({
+      ...(name  !== undefined && { name }),
+      ...(email !== undefined && { email }),
+      ...(phone !== undefined && { phone }),
+      ...(city  !== undefined && { city }),
+    });
+
+    // toSafeJSON() elimina password / tokens de verificación y reset del payload.
+    res.json({ success: true, data: user.toSafeJSON(), message: 'Perfil actualizado correctamente' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Actualizar el perfil del trabajador autenticado
 router.put('/worker-profile', authenticate, async (req, res, next) => {
   try {
@@ -170,6 +204,50 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
     });
 
     res.json({ success: true, data: workerProfile, message: 'Perfil actualizado exitosamente' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── PATCH /users/me/password — cambiar contraseña del usuario autenticado ──
+router.patch('/me/password', authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (
+      !newPassword ||
+      newPassword.length < 8 ||
+      !/[A-Z]/.test(newPassword) ||
+      !/[a-z]/.test(newPassword) ||
+      !/[0-9]/.test(newPassword)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula y un número',
+      });
+    }
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+
+    const isValid = await user.comparePassword(currentPassword);
+    if (!isValid) {
+      return res.status(401).json({ success: false, message: 'La contraseña actual es incorrecta' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    // Invalidar todas las sesiones activas: si el usuario cambia su contraseña,
+    // cualquier token robado previo deja de funcionar.
+    await revokeAllRefreshTokens(req.user.id);
+    const decoded = require('jsonwebtoken').decode(req.token);
+    if (decoded?.exp) {
+      const ttl = decoded.exp - Math.floor(Date.now() / 1000);
+      if (ttl > 0) await blacklistAccessToken(req.token, ttl);
+    }
+
+    res.json({ success: true, message: 'Contraseña actualizada. Inicia sesión nuevamente.' });
   } catch (error) {
     next(error);
   }

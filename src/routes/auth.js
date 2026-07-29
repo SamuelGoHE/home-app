@@ -2,6 +2,7 @@ const { Router } = require('express');
 const { body } = require('express-validator');
 const ctrl = require('../controllers/authController');
 const { authenticate } = require('../middlewares/auth');
+const { loginLimiter, forgotPasswordLimiter } = require('../middlewares/rateLimiter');
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.post('/register', [
   body('role').optional().isIn(['cliente','trabajador']).withMessage('Rol inválido'),
 ], ctrl.register);
 
-router.post('/login', [
+router.post('/login', loginLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
   body('password').notEmpty().withMessage('Contraseña requerida'),
 ], ctrl.login);
@@ -21,8 +22,14 @@ router.post('/login', [
 router.post('/oauth', ctrl.oauthSignIn);
 
 router.post('/refresh', ctrl.refreshToken);
-router.post('/forgot-password', ctrl.forgotPassword);
-router.post('/reset-password', ctrl.resetPassword);
+router.post('/forgot-password', forgotPasswordLimiter, [
+  body('email').isEmail().normalizeEmail().withMessage('Email inválido'),
+], ctrl.forgotPassword);
+router.post('/reset-password', [
+  body('token').notEmpty().withMessage('Token requerido'),
+  body('password').isLength({ min: 8 }).withMessage('Mínimo 8 caracteres')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Debe tener mayúscula, minúscula y número'),
+], ctrl.resetPassword);
 router.get('/me', authenticate, ctrl.getMe);
 router.post('/logout', authenticate, ctrl.logout);
 
