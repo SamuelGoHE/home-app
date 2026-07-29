@@ -7,14 +7,19 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed": "node src/config/seed.js",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "db:migrate": "sequelize-cli db:migrate",
+    "db:migrate:undo": "sequelize-cli db:migrate:undo",
+    "db:migrate:undo:all": "sequelize-cli db:migrate:undo:all",
+    "db:seed:services": "sequelize-cli db:seed --seed 20240101000001-initial-services.js"
   },
   "dependencies": {
-    "axios": "^1.15.2",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.105.4",
+    "axios": "^1.16.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "expo": "^55.0.19",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
@@ -23,7 +28,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^6.9.7",
+    "nodemailer": "^8.0.7",
     "pg": "^8.11.3",
     "redis": "^4.6.10",
     "sequelize": "^6.35.1",
@@ -33,6 +38,7 @@
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.0.2",
+    "sequelize-cli": "^6.6.5",
     "supertest": "^6.3.3"
   }
 }

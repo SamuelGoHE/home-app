@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "home-mobile",
+    "slug": "home-mobile",
+    "scheme": "homeapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.samuelgomez.homeapp"
+    },
+    "android": {
+      "package": "com.samuelgomez.homeapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.622836904103-folvmcenrhp6br5r095hrm6n218imo4m"
+        }
+      ]
+    ]
+  }
+}
