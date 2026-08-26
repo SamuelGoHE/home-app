@@ -2,15 +2,16 @@ import { useState, useEffect, useRef } from 'react'
 import { io } from 'socket.io-client'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import api from '../services/api'
+import { SOCKET_URL } from '../utils/apiUrl'
 
-// Utilizamos la misma URL base que useApi, pero solo el host para Socket.io
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.40.14:3000/api'
-const SOCKET_URL = API_URL.replace('/api', '')
 export function useChat(projectId, userId) {
   const [messages, setMessages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [reloadToken, setReloadToken] = useState(0)
   const socketRef = useRef(null)
+
+  const refetch = () => setReloadToken((n) => n + 1)
 
   useEffect(() => {
     if (!projectId || !userId) return
@@ -19,6 +20,7 @@ export function useChat(projectId, userId) {
     const fetchHistory = async () => {
       try {
         setLoading(true)
+        setError(null)
         // Usamos la instancia de axios configurada en la aplicación
         const res = await api.get(`/messages/${projectId}`)
 
@@ -65,7 +67,7 @@ export function useChat(projectId, userId) {
         socketRef.current.disconnect()
       }
     }
-  }, [projectId, userId])
+  }, [projectId, userId, reloadToken])
 
   const sendMessage = (text) => {
     if (!socketRef.current || !text.trim()) return
@@ -80,7 +82,7 @@ export function useChat(projectId, userId) {
     socketRef.current.emit('send_message', messageData)
   }
 
-  return { messages, sendMessage, loading, error }
+  return { messages, sendMessage, loading, error, refetch }
 }
 
 /**

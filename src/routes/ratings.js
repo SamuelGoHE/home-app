@@ -38,6 +38,15 @@ router.post('/', authorize('cliente'), [
     } catch (e) { res.status(e.statusCode || 500).json({ success: false, message: e.message }); }
 });
 
+// GET /api/ratings/recent — proyectos recién completados del propio cliente
+router.get('/recent', authorize('cliente'), async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit, 10) || 6, 20);
+        const ratings = await ratingService.getRecentRatings(req.user.id, limit);
+        res.json({ success: true, data: ratings });
+    } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+});
+
 // GET /api/ratings/worker/:id — calificaciones de un trabajador (todos los roles)
 router.get('/worker/:id', async (req, res) => {
     try {

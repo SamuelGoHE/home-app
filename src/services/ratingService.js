@@ -1,4 +1,4 @@
-const { Rating, User, Project } = require('../models');
+const { Rating, User, Project, Service } = require('../models');
 const { Op } = require('sequelize');
 
 // Crear calificación
@@ -73,6 +73,23 @@ const canRate = async (reviewerId, projectId) => {
     return { canRate: true };
 };
 
+// Calificaciones recientes del propio cliente (sus proyectos ya calificados),
+// para la sección "Proyectos recién completados" en su home — no de otros clientes.
+const getRecentRatings = async (reviewerId, limit = 6) => {
+    return Rating.findAll({
+        where: { reviewer_id: reviewerId, score: { [Op.gte]: 4 } },
+        include: [
+            { model: User, as: 'worker', attributes: ['id', 'name', 'avatar', 'rating_avg'] },
+            {
+                model: Project, as: 'project', attributes: ['id', 'title', 'city'],
+                include: [{ model: Service, as: 'service', attributes: ['id', 'name', 'category', 'image_url'] }],
+            },
+        ],
+        order: [['createdAt', 'DESC']],
+        limit,
+    });
+};
+
 // Obtener todas las calificaciones (admin)
 const getAllRatings = async () => {
     return Rating.findAll({
@@ -85,4 +102,4 @@ const getAllRatings = async () => {
     });
 };
 
-module.exports = { createRating, getWorkerRatings, canRate, getAllRatings };
+module.exports = { createRating, getWorkerRatings, canRate, getAllRatings, getRecentRatings };

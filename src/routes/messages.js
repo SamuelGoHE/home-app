@@ -1,8 +1,25 @@
 const { Router } = require('express');
 const { Message, User } = require('../models');
 const { authenticate } = require('../middlewares/auth');
+const messageService = require('../services/messageService');
 
 const router = Router();
+
+// Listar mis conversaciones (una por proyecto con al menos un mensaje).
+// Debe ir ANTES de '/:projectId' para que Express no la confunda con un id.
+router.get('/conversations', authenticate, async (req, res) => {
+  try {
+    res.json({ success: true, data: await messageService.getConversations(req.user) });
+  } catch (e) { res.status(e.statusCode || 500).json({ success: false, message: e.message }); }
+});
+
+// Marcar como leídos los mensajes de la contraparte en un proyecto
+router.patch('/:projectId/read', authenticate, async (req, res) => {
+  try {
+    await messageService.markAsRead(req.params.projectId, req.user);
+    res.json({ success: true });
+  } catch (e) { res.status(e.statusCode || 500).json({ success: false, message: e.message }); }
+});
 
 // Obtener el historial de chat de un proyecto
 router.get('/:projectId', authenticate, async (req, res, next) => {
