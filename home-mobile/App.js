@@ -42,6 +42,7 @@ import ProjectsScreen from './src/screens/Projectsscreen';
 import ProjectDetailScreen from './src/screens/Projectdetailscreen';
 import CalendarScreen from './src/screens/Calendarscreen';
 import ChatScreen from './src/screens/Chatscreen';
+import ChatsListScreen from './src/screens/Chatslistscreen';
 import RatingScreen from './src/screens/Ratingscreen';
 import SecurityScreen from './src/screens/Securityscreen';
 
@@ -81,6 +82,7 @@ function HomeTabStack() {
       <HomeStack.Screen name="Results"       component={ResultsScreen} />
       <HomeStack.Screen name="WorkerDetail"  component={WorkerDetailScreen} />
       <HomeStack.Screen name="Calendar"      component={CalendarScreen} />
+      <HomeStack.Screen name="ChatsList"     component={ChatsListScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -177,7 +179,19 @@ function ClientTabs() {
     >
       <Tab.Screen name="HomeTab"      component={HomeTabStack}      options={{ tabBarLabel: 'Inicio' }} />
       <Tab.Screen name="ServicesTab"  component={ServicesTabStack}  options={{ tabBarLabel: 'Servicios' }} />
-      <Tab.Screen name="ProjectsTab"  component={ProjectsTabStack}  options={{ tabBarLabel: 'Proyectos' }} />
+      <Tab.Screen
+        name="ProjectsTab"
+        component={ProjectsTabStack}
+        options={{ tabBarLabel: 'Proyectos' }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            // Tocar el tab siempre debe mostrar el listado, no quedarse en el
+            // último detalle abierto (p.ej. al entrar desde "Proyectos recién
+            // completados" en el Home y luego cambiar de pestaña).
+            navigation.navigate('ProjectsTab', { screen: 'ProjectsTabScreen' });
+          },
+        })}
+      />
 <Tab.Screen name="ProfileTab"   component={ProfileTabStack}   options={{ tabBarLabel: 'Perfil' }} />
     </Tab.Navigator>
   );
@@ -204,7 +218,16 @@ function WorkerTabs() {
       })}
     >
       <Tab.Screen name="WorkerHomeTab" component={WorkerHomeTabStack}     options={{ tabBarLabel: 'Inicio' }} />
-      <Tab.Screen name="ProjectsTab"   component={WorkerProjectsTabStack} options={{ tabBarLabel: 'Trabajos' }} />
+      <Tab.Screen
+        name="ProjectsTab"
+        component={WorkerProjectsTabStack}
+        options={{ tabBarLabel: 'Trabajos' }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('ProjectsTab', { screen: 'ProjectsTabScreen' });
+          },
+        })}
+      />
       <Tab.Screen name="ProfileTab"    component={WorkerProfileTabStack}  options={{ tabBarLabel: 'Perfil' }} />
     </Tab.Navigator>
   );

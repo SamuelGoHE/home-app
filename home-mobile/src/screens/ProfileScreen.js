@@ -11,6 +11,7 @@ import {
 } from 'lucide-react-native';
 import { useAuthStore } from '../context/authStore';
 import { useNotifications } from '../hooks/useNotifications';
+import { Button, Card } from '../components/ui';
 
 /* ─── Menú cliente ───────────────────────────────────────────────── */
 const CLIENT_MENU = [
@@ -79,8 +80,8 @@ function MenuItem({ item, onPress, showDot }) {
       >
         <item.icon size={18} color={item.iconColor} />
       </View>
-      <Text className="flex-1 font-semibold text-[15px] text-[#111]">{item.label}</Text>
-      {showDot && <View className="w-2 h-2 rounded-full bg-[#E8432D] mr-2" />}
+      <Text className="flex-1 font-semibold text-[15px] text-ink">{item.label}</Text>
+      {showDot && <View className="w-2 h-2 rounded-full bg-brand mr-2" />}
       <ChevronRight size={17} color="#d1d5db" />
     </TouchableOpacity>
   );
@@ -133,16 +134,24 @@ export default function ProfileScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-[#E8432D]" edges={['top']}>
+    <SafeAreaView className="flex-1 bg-brand" edges={['top']}>
       <ScrollView
-        className="flex-1 bg-[#f8f9fb]"
+        className="flex-1 bg-background"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 20 }}
       >
+        {/* Extiende el naranja por encima del contenido para que el rebote
+            elástico del scroll (iOS) no destape el fondo gris del ScrollView */}
+        <View
+          pointerEvents="none"
+          className="bg-brand"
+          style={{ position: 'absolute', top: -300, left: 0, right: 0, height: 300 }}
+        />
+
         {/* ── Header ── */}
         <View
-          className="pt-4 px-5 items-center overflow-hidden"
-          style={{ backgroundColor: '#E8432D', paddingBottom: headerPb }}
+          className="pt-4 px-5 items-center overflow-hidden bg-brand"
+          style={{ paddingBottom: headerPb }}
         >
           <View className="absolute rounded-full" style={{ width: 160, height: 160, backgroundColor: 'rgba(255,255,255,0.08)', top: -40, right: -40 }} />
           <View className="absolute rounded-full" style={{ width: 128, height: 128, backgroundColor: 'rgba(0,0,0,0.07)', bottom: 0, left: -40 }} />
@@ -150,7 +159,7 @@ export default function ProfileScreen({ navigation }) {
           {/* Avatar */}
           <View className="relative mb-3">
             <View
-              className="bg-white p-1 shadow-xl"
+              className="bg-surface p-1 shadow-xl"
               style={{ width: avatarSize, height: avatarSize, borderRadius: avatarRadius }}
             >
               {user?.avatar ? (
@@ -174,7 +183,7 @@ export default function ProfileScreen({ navigation }) {
               )}
             </View>
             {isOAuth && (
-              <View className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-sm">
+              <View className="absolute -bottom-2 -right-2 bg-surface rounded-full p-1 shadow-sm">
                 <View className="w-6 h-6 bg-gray-100 rounded-full items-center justify-center">
                   <Text className="text-[10px] font-bold text-gray-600">
                     {user.oauth_provider === 'google' ? 'G' : user.oauth_provider === 'facebook' ? 'f' : '🍎'}
@@ -217,7 +226,7 @@ export default function ProfileScreen({ navigation }) {
                   {group.title}
                 </Text>
               ) : null}
-              <View className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 {group.items.map((item, iIdx) => (
                   <MenuItem
                     key={iIdx}
@@ -226,20 +235,23 @@ export default function ProfileScreen({ navigation }) {
                     showDot={item.isNotif && hasUnreadNotifs}
                   />
                 ))}
-              </View>
+              </Card>
             </View>
           ))}
 
           {/* Botón cerrar sesión */}
-          <TouchableOpacity
+          <Button
+            variant="secondary"
             onPress={handleLogout}
-            className="flex-row items-center justify-center gap-2 rounded-2xl bg-white border-2 border-red-100 shadow-sm"
+            accessibilityLabel="Cerrar sesión"
+            className="!border-2 !border-red-100"
             style={{ paddingVertical: isSmall ? 12 : 16 }}
-            activeOpacity={0.8}
           >
-            <LogOut size={18} color="#ef4444" />
-            <Text className="text-red-500 font-bold text-[15px]">Cerrar sesión</Text>
-          </TouchableOpacity>
+            <View className="flex-row items-center justify-center gap-2">
+              <LogOut size={18} color="#ef4444" />
+              <Text className="text-red-500 font-bold text-[15px]">Cerrar sesión</Text>
+            </View>
+          </Button>
 
           <Text className="text-center text-[11px] font-medium text-gray-400 mb-1">
             HOME App v1.0.0
