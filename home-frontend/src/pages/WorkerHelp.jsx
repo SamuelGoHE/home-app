@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../context/authStore'
+import { IconButton } from '../components/ui'
 
 const FAQS = [
   {
@@ -33,19 +34,20 @@ export default function WorkerHelp() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center overflow-x-hidden font-outfit">
-      <div className="w-full max-w-[480px] bg-[#f8f9fb] min-h-screen shadow-2xl relative flex flex-col animate-fade-in">
+      <div className="w-full max-w-[480px] bg-background min-h-screen shadow-2xl relative flex flex-col animate-fade-in">
         
         {/* ── HEADER ROJO ── */}
-        <div className="bg-[#E8432D] pt-16 pb-24 px-6 text-center relative">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="absolute top-12 left-6 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center active:scale-90 transition-transform"
-          >
-            <ArrowLeft size={20} />
-          </button>
+        <div className="bg-brand pt-16 pb-24 px-6 text-center relative">
+          <IconButton
+            icon={ArrowLeft}
+            variant="ghost"
+            aria-label="Volver"
+            className="absolute top-12 left-6 !bg-white/20 !text-white backdrop-blur-md active:scale-90"
+            onClick={() => navigate(-1)}
+          />
 
           <div className="w-20 h-20 bg-white rounded-[28px] mx-auto shadow-2xl flex items-center justify-center overflow-hidden border-4 border-white/20 mb-4">
-            <div className="w-full h-full bg-orange-50 flex items-center justify-center text-[#E8432D]">
+            <div className="w-full h-full bg-orange-50 flex items-center justify-center text-brand">
               <HelpCircle size={32} />
             </div>
           </div>
@@ -76,10 +78,10 @@ export default function WorkerHelp() {
                         onClick={() => setOpenFaq(isOpen ? null : idx)}
                         className="w-full p-5 flex items-center justify-between text-left transition-colors"
                       >
-                        <span className={`text-[14px] font-black pr-4 ${isOpen ? 'text-[#E8432D]' : 'text-[#111]'}`}>
+                        <span className={`text-[14px] font-black pr-4 ${isOpen ? 'text-brand' : 'text-ink'}`}>
                           {faq.question}
                         </span>
-                        <ChevronDown size={18} className={`text-gray-300 transition-transform ${isOpen ? 'rotate-180 text-[#E8432D]' : ''}`} />
+                        <ChevronDown size={18} className={`text-gray-300 transition-transform ${isOpen ? 'rotate-180 text-brand' : ''}`} />
                       </button>
                       {isOpen && (
                         <div className="px-5 pb-5 animate-fade-in">
@@ -102,13 +104,13 @@ export default function WorkerHelp() {
                   <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-orange-500 shadow-sm">
                     <AlertTriangle size={18} />
                   </div>
-                  <span className="font-black text-[14px] text-[#111]">Reportar un incidente</span>
+                  <span className="font-black text-[14px] text-ink">Reportar un incidente</span>
                 </button>
                 <button className="w-full flex items-center gap-4 p-4 bg-gray-50 rounded-3xl hover:bg-white border border-transparent hover:border-gray-100 transition-all">
                   <div className="w-10 h-10 rounded-2xl bg-white flex items-center justify-center text-gray-400 shadow-sm">
                     <ShieldCheck size={18} />
                   </div>
-                  <span className="font-black text-[14px] text-[#111]">Términos de servicio</span>
+                  <span className="font-black text-[14px] text-ink">Términos de servicio</span>
                 </button>
               </div>
             </div>

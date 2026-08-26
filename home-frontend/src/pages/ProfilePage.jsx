@@ -1,13 +1,14 @@
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../context/authStore'
-import { 
-  LogOut, ChevronRight, User, Heart, Star, 
+import {
+  LogOut, ChevronRight, User, Heart, Star,
   FileText, Settings, HelpCircle, Shield, Bell
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useState } from 'react'
 import { useNotifications } from '../hooks/useNotifications'
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel'
+import { Button, Card } from '../components/ui'
 
 /* ─── Agrupación de Menú ─────────────────────────────────────────── */
 const MENU_GROUPS = [
@@ -52,19 +53,19 @@ export default function ProfilePage() {
   const isOAuth = user?.oauth_provider && user.oauth_provider !== 'local'
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] page-enter flex flex-col px-4 sm:px-6 lg:px-10 xl:px-16">
+    <div className="min-h-screen bg-background page-enter flex flex-col px-4 sm:px-6 lg:px-10 xl:px-16">
       <NotificationsPanel isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} notifications={notifications} />
 
       {/* ── Header con Gradiente ── */}
-      <div className="relative bg-gradient-to-b from-[#E8432D] to-[#c93820] pt-14 pb-20 px-4 sm:px-6 lg:px-10 xl:px-16 overflow-hidden">
+      <div className="relative bg-gradient-to-b from-brand to-brand-dark pt-14 pb-20 px-4 sm:px-6 lg:px-10 xl:px-16 overflow-hidden">
         {/* Decoración de fondo */}
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/10 rounded-full blur-2xl" />
         <div className="absolute -left-10 bottom-0 w-32 h-32 bg-black/10 rounded-full blur-xl" />
-        
+
         <div className="relative z-10 flex flex-col items-center text-center">
           {/* Avatar */}
           <div className="relative mb-3">
-            <div className="w-24 h-24 rounded-[28px] bg-white p-1 shadow-xl">
+            <div className="w-24 h-24 rounded-[28px] bg-surface p-1 shadow-xl">
               {user?.avatar ? (
                 <img src={user.avatar} alt={user.name} className="w-full h-full object-cover rounded-[24px]" />
               ) : (
@@ -74,7 +75,7 @@ export default function ProfilePage() {
               )}
             </div>
             {isOAuth && (
-              <div className="absolute -bottom-2 -right-2 bg-white rounded-full p-1 shadow-sm">
+              <div className="absolute -bottom-2 -right-2 bg-surface rounded-full p-1 shadow-sm">
                 <div className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-[10px]">
                   {user.oauth_provider === 'google' ? 'G' : user.oauth_provider === 'facebook' ? 'f' : '🍎'}
                 </div>
@@ -88,7 +89,7 @@ export default function ProfilePage() {
           <p className="text-white/80 text-[14px] font-medium mt-0.5">
             {user?.email}
           </p>
-          
+
           <div className="mt-3 flex gap-2">
             <span className="bg-white/20 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1 rounded-full border border-white/20 capitalize">
               {user?.role === 'trabajador' ? 'Trabajador' : 'Cliente'}
@@ -104,17 +105,17 @@ export default function ProfilePage() {
 
       {/* ── Contenido ── */}
       <div className="flex-1 px-4 sm:px-6 lg:px-10 xl:px-16 -mt-10 pb-10 relative z-20">
-        
+
         {/* Grupos de menú */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           {MENU_GROUPS.map((group, gIdx) => (
             <div key={gIdx} className="stagger" style={{ animationDelay: `${gIdx * 0.1}s` }}>
               {group.title && (
-                <h3 className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-2.5 ml-2">
+                <h3 className="text-label uppercase text-muted mb-2.5 ml-2">
                   {group.title}
                 </h3>
               )}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+              <Card padding="none" className="overflow-hidden">
                 {group.items.map((item, iIdx) => {
                   const isNotif = item.label === 'Notificaciones'
 
@@ -126,35 +127,38 @@ export default function ProfilePage() {
                         else if (item.path) navigate(item.path)
                         else toast('Esta sección estará disponible pronto', { icon: '🚧' })
                       }}
-                      className="w-full flex items-center gap-4 px-4 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/80 active:bg-gray-100 transition-colors relative"
+                      className="w-full flex items-center gap-4 px-4 py-3.5 border-b border-border last:border-0 hover:bg-background/80 active:bg-gray-100 transition-colors relative"
                     >
                       <div className={`w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0 ${item.bg}`}>
                         <item.icon size={18} className={item.color} />
                       </div>
-                      <span className="flex-1 text-left font-semibold text-[15px] text-[#111]">
+                      <span className="flex-1 text-left font-semibold text-[15px] text-ink">
                         {item.label}
                       </span>
                       {isNotif && hasUnreadNotifs && (
-                        <div className="w-2 h-2 rounded-full bg-[#E8432D] absolute right-12" />
+                        <div className="w-2 h-2 rounded-full bg-brand absolute right-12" />
                       )}
                       <ChevronRight size={17} className="text-gray-300" />
                     </button>
                   )
                 })}
-              </div>
+              </Card>
             </div>
           ))}
         </div>
 
         {/* Botón de cerrar sesión */}
-        <button 
+        <Button
+          variant="secondary"
+          fullWidth
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 mt-8 py-4 rounded-2xl bg-white border-2 border-red-100 text-red-500 font-bold text-[15px] hover:bg-red-50 active:scale-[.98] transition-all shadow-sm"
+          aria-label="Cerrar sesión"
+          className="mt-8 !border-2 !border-red-100 !text-red-500 hover:!bg-red-50"
         >
-          <LogOut size={18} />
+          <LogOut size={18} aria-hidden="true" />
           Cerrar sesión
-        </button>
-        
+        </Button>
+
         <p className="text-center text-[11px] font-medium text-gray-400 mt-6">
           HOME App v1.0.0
         </p>

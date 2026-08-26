@@ -4,9 +4,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    ArrowLeft, MessageCircle, Mail, Phone,
+    MessageCircle, Mail, Phone,
     ChevronDown, ChevronUp, AlertTriangle, ShieldCheck,
 } from 'lucide-react-native';
+import { BackButton, Card } from '../components/ui';
+
+/**
+ * Colores literales necesarios para props `color` de lucide-react-native
+ * (los íconos SVG no aceptan clases de Tailwind). Los que coinciden con un
+ * token del design system se centralizan aquí; los que no (WhatsApp,
+ * correo, teléfono — acentos de marca de terceros o decorativos sin
+ * equivalente semántico) se mantienen sueltos y documentados en su uso.
+ */
+const ICON = {
+    muted: '#6b7280',    // = tokens.colors.muted
+    brand: '#E8432D',    // = tokens.colors.brand.DEFAULT
+    brandSoft: '#fff4f2', // = tokens.colors.brand.soft
+    surface: '#ffffff',  // = tokens.colors.surface.DEFAULT
+};
 
 /* ─── FAQs ───────────────────────────────────────────────────────── */
 const FAQS = [
@@ -35,12 +50,15 @@ function FaqItem({ faq, open, onToggle }) {
             onPress={onToggle}
             className="border-b border-gray-50 last:border-0"
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={faq.question}
+            accessibilityState={{ expanded: open }}
         >
             <View className="flex-row items-center justify-between px-5 py-4">
-                <Text className="flex-1 font-semibold text-[14px] text-[#111] pr-3">{faq.question}</Text>
+                <Text className="flex-1 font-semibold text-[14px] text-ink pr-3">{faq.question}</Text>
                 {open
-                    ? <ChevronUp size={17} color="#9ca3af" />
-                    : <ChevronDown size={17} color="#9ca3af" />
+                    ? <ChevronUp size={17} color={ICON.muted} />
+                    : <ChevronDown size={17} color={ICON.muted} />
                 }
             </View>
             {open && (
@@ -59,12 +77,15 @@ function ContactBtn({ icon: Icon, label, sublabel, color, bg, onPress }) {
             onPress={onPress}
             className="flex-row items-center gap-4 p-4 border-b border-gray-50 last:border-0 active:bg-gray-50"
             activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={label}
+            accessibilityHint={sublabel}
         >
             <View className="w-11 h-11 rounded-2xl items-center justify-center flex-shrink-0" style={{ backgroundColor: bg }}>
                 <Icon size={20} color={color} />
             </View>
             <View className="flex-1">
-                <Text className="font-bold text-[15px] text-[#111]">{label}</Text>
+                <Text className="font-bold text-[15px] text-ink">{label}</Text>
                 <Text className="text-[12px] text-gray-400 mt-0.5">{sublabel}</Text>
             </View>
         </TouchableOpacity>
@@ -95,16 +116,11 @@ export default function HelpCenterScreen({ navigation }) {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#f8f9fb]">
+        <SafeAreaView className="flex-1 bg-background">
             {/* Header */}
-            <View className="bg-white px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-gray-100">
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    className="w-9 h-9 items-center justify-center rounded-xl bg-gray-100"
-                >
-                    <ArrowLeft size={18} color="#4b5563" />
-                </TouchableOpacity>
-                <Text className="font-extrabold text-[17px] text-[#111]">Centro de ayuda</Text>
+            <View className="bg-surface px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-gray-100">
+                <BackButton onPress={() => navigation.goBack()} />
+                <Text className="font-extrabold text-[17px] text-ink">Centro de ayuda</Text>
             </View>
 
             <ScrollView
@@ -113,16 +129,13 @@ export default function HelpCenterScreen({ navigation }) {
                 showsVerticalScrollIndicator={false}
             >
                 {/* Banner */}
-                <View
-                    className="rounded-3xl p-6 mb-6 items-center overflow-hidden"
-                    style={{ backgroundColor: '#E8432D' }}
-                >
+                <View className="rounded-3xl p-6 mb-6 items-center overflow-hidden bg-brand">
                     <View
-                        className="absolute rounded-full"
-                        style={{ width: 96, height: 96, backgroundColor: 'rgba(255,255,255,0.1)', top: -24, right: -24 }}
+                        className="absolute rounded-full bg-white/10"
+                        style={{ width: 96, height: 96, top: -24, right: -24 }}
                     />
-                    <View className="w-14 h-14 rounded-2xl items-center justify-center mb-3" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}>
-                        <MessageCircle size={28} color="#fff" />
+                    <View className="w-14 h-14 rounded-2xl items-center justify-center mb-3 bg-white/20">
+                        <MessageCircle size={28} color={ICON.surface} />
                     </View>
                     <Text className="text-[20px] font-extrabold text-white leading-tight text-center">
                         ¿En qué podemos ayudarte?
@@ -136,7 +149,7 @@ export default function HelpCenterScreen({ navigation }) {
                 <Text className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-2.5 ml-2">
                     Contacto Directo
                 </Text>
-                <View className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <Card padding="none" className="overflow-hidden mb-6">
                     <ContactBtn
                         icon={MessageCircle}
                         label="WhatsApp"
@@ -157,17 +170,17 @@ export default function HelpCenterScreen({ navigation }) {
                         icon={Phone}
                         label="Llamada telefónica"
                         sublabel="Lun–Vie, 8am–6pm"
-                        color="#E8432D"
-                        bg="#fff4f2"
+                        color={ICON.brand}
+                        bg={ICON.brandSoft}
                         onPress={handlePhone}
                     />
-                </View>
+                </Card>
 
                 {/* FAQs */}
                 <Text className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-2.5 ml-2">
                     Preguntas Frecuentes
                 </Text>
-                <View className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-6">
+                <Card padding="none" className="overflow-hidden mb-6">
                     {FAQS.map((faq, i) => (
                         <FaqItem
                             key={i}
@@ -176,34 +189,38 @@ export default function HelpCenterScreen({ navigation }) {
                             onToggle={() => toggleFaq(i)}
                         />
                     ))}
-                </View>
+                </Card>
 
                 {/* Reportar / Políticas */}
                 <Text className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-2.5 ml-2">
                     Más Opciones
                 </Text>
-                <View className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+                <Card padding="none" className="overflow-hidden">
                     <TouchableOpacity
                         className="flex-row items-center gap-4 px-4 py-4 border-b border-gray-50 active:bg-gray-50"
                         onPress={() => Alert.alert('Reportar problema', 'Esta función estará disponible pronto.')}
                         activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel="Reportar un problema"
                     >
                         <View className="w-9 h-9 rounded-2xl items-center justify-center bg-orange-50">
                             <AlertTriangle size={18} color="#f97316" />
                         </View>
-                        <Text className="flex-1 font-semibold text-[15px] text-[#111]">Reportar un problema</Text>
+                        <Text className="flex-1 font-semibold text-[15px] text-ink">Reportar un problema</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         className="flex-row items-center gap-4 px-4 py-4 active:bg-gray-50"
                         onPress={() => Alert.alert('Políticas', 'Esta función estará disponible pronto.')}
                         activeOpacity={0.75}
+                        accessibilityRole="button"
+                        accessibilityLabel="Políticas de privacidad"
                     >
                         <View className="w-9 h-9 rounded-2xl items-center justify-center bg-emerald-50">
                             <ShieldCheck size={18} color="#10b981" />
                         </View>
-                        <Text className="flex-1 font-semibold text-[15px] text-[#111]">Políticas de privacidad</Text>
+                        <Text className="flex-1 font-semibold text-[15px] text-ink">Políticas de privacidad</Text>
                     </TouchableOpacity>
-                </View>
+                </Card>
             </ScrollView>
         </SafeAreaView>
     );

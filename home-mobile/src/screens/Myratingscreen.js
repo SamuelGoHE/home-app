@@ -1,12 +1,31 @@
 import React, { useEffect, useState } from 'react';
 import {
-    View, Text, ScrollView, TouchableOpacity,
-    Image, ActivityIndicator, Alert,
+    View, Text, ScrollView,
+    Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Star, MapPin, MessageSquare } from 'lucide-react-native';
+import { Star, MapPin, MessageSquare } from 'lucide-react-native';
 import api from '../services/api';
 import { useAuthStore } from '../context/authStore';
+import { BackButton, Card, EmptyState, ErrorState } from '../components/ui';
+
+/**
+ * Colores literales necesarios para props `color`/`fill` de
+ * lucide-react-native (los íconos SVG no aceptan clases de Tailwind).
+ * Mismo patrón que Projectdetailscreen.js (piloto).
+ */
+const ICON = {
+    brand: '#E8432D',      // = tokens.colors.brand.DEFAULT — estrellas "llenas" (no es el acento amber de rating)
+    starEmpty: '#e5e7eb',  // = Tailwind gray-200 — borde de estrella "vacía"
+    starEmptyFill: '#f3f4f6', // = Tailwind gray-100 — relleno de estrella "vacía"
+    muted: '#9ca3af',      // = Tailwind gray-400
+    mutedLight: '#d1d5db', // = Tailwind gray-300
+};
+
+// Acento de calificación — deliberadamente fuera del mapa de status.js: el
+// amber está atado al concepto de "rating/estrellas", no a un estado de
+// proyecto (mismo criterio ya aplicado en Projectdetailscreen.js).
+const RATING_COLOR = '#f59e0b';
 
 /* ─── Fila de estrellas ──────────────────────────────────────────── */
 function StarRow({ score }) {
@@ -16,8 +35,8 @@ function StarRow({ score }) {
                 <Star
                     key={n}
                     size={14}
-                    color={n <= score ? '#E8432D' : '#e5e7eb'}
-                    fill={n <= score ? '#E8432D' : '#f3f4f6'}
+                    color={n <= score ? ICON.brand : ICON.starEmpty}
+                    fill={n <= score ? ICON.brand : ICON.starEmptyFill}
                 />
             ))}
         </View>
@@ -25,6 +44,9 @@ function StarRow({ score }) {
 }
 
 /* ─── Skeleton card ──────────────────────────────────────────────── */
+// Nota: esta implementación local NO se toca en esta fase — ver comentario
+// en components/ui/Skeleton.js, que documenta esta pantalla como una de las
+// dos existentes que se dejan tal cual hasta una fase futura.
 function SkeletonCard() {
     return (
         <View className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -49,44 +71,41 @@ export default function MyRatingsScreen({ navigation }) {
     const [ratings, setRatings] = useState([]);
     const [summary, setSummary] = useState(null); // { avg, count } solo para trabajador
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const load = async () => {
-            try {
-                if (isWorker) {
-                    // El trabajador ve las calificaciones que RECIBIÓ
-                    const res = await api.get(`/ratings/worker/${user.id}`);
-                    const data = res.data.data || {};
-                    setRatings(data.ratings || []);
-                    setSummary({
-                        avg:   data.worker?.rating_avg ?? 0,
-                        count: data.worker?.rating_count ?? (data.ratings?.length || 0),
-                    });
-                } else {
-                    // El cliente ve las calificaciones que DIO
-                    const res = await api.get('/ratings/my');
-                    setRatings(res.data.data || []);
-                }
-            } catch {
-                Alert.alert('Error', 'No se pudieron cargar las calificaciones');
-            } finally {
-                setLoading(false);
+    const load = React.useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            if (isWorker) {
+                // El trabajador ve las calificaciones que RECIBIÓ
+                const res = await api.get(`/ratings/worker/${user.id}`);
+                const data = res.data.data || {};
+                setRatings(data.ratings || []);
+                setSummary({
+                    avg:   data.worker?.rating_avg ?? 0,
+                    count: data.worker?.rating_count ?? (data.ratings?.length || 0),
+                });
+            } else {
+                // El cliente ve las calificaciones que DIO
+                const res = await api.get('/ratings/my');
+                setRatings(res.data.data || []);
             }
-        };
-        load();
+        } catch (err) {
+            setError(err.response?.data?.message || 'No se pudieron cargar las calificaciones');
+        } finally {
+            setLoading(false);
+        }
     }, [isWorker, user?.id]);
 
+    useEffect(() => { load(); }, [load]);
+
     return (
-        <SafeAreaView className="flex-1 bg-[#f8f9fb]">
+        <SafeAreaView className="flex-1 bg-background">
             {/* Header */}
-            <View className="bg-white px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-gray-100">
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    className="w-9 h-9 items-center justify-center rounded-xl bg-gray-100"
-                >
-                    <ArrowLeft size={18} color="#4b5563" />
-                </TouchableOpacity>
-                <Text className="font-extrabold text-[17px] text-[#111]">Mis calificaciones</Text>
+            <View className="bg-surface px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-border">
+                <BackButton onPress={() => navigation.goBack()} />
+                <Text className="font-extrabold text-[17px] text-ink">Mis calificaciones</Text>
             </View>
 
             <ScrollView
@@ -96,7 +115,7 @@ export default function MyRatingsScreen({ navigation }) {
             >
                 {/* Resumen del trabajador */}
                 {!loading && isWorker && summary && (summary.count > 0) && (
-                    <View className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm mb-5 flex-row items-center gap-4">
+                    <Card padding="md" className="mb-5 flex-row items-center gap-4">
                         <View className="w-20 h-20 rounded-3xl bg-amber-50 items-center justify-center">
                             <Text className="text-[28px] font-extrabold text-amber-500">
                                 {Number(summary.avg).toFixed(1)}
@@ -104,14 +123,14 @@ export default function MyRatingsScreen({ navigation }) {
                         </View>
                         <View className="flex-1">
                             <StarRow score={Math.round(summary.avg)} />
-                            <Text className="text-[13px] text-gray-500 font-medium mt-1.5">
+                            <Text className="text-[13px] text-muted font-medium mt-1.5">
                                 Promedio de {summary.count} calificación{summary.count !== 1 ? 'es' : ''}
                             </Text>
-                            <Text className="text-[12px] text-gray-400 mt-0.5">
+                            <Text className="text-[12px] text-muted mt-0.5">
                                 Lo que tus clientes opinan de tu trabajo
                             </Text>
                         </View>
-                    </View>
+                    </Card>
                 )}
 
                 {/* Skeletons */}
@@ -121,37 +140,39 @@ export default function MyRatingsScreen({ navigation }) {
                     </View>
                 ))}
 
+                {/* Error state */}
+                {!loading && error && (
+                    <View className="mt-4">
+                        <ErrorState message={error} onRetry={load} />
+                    </View>
+                )}
+
                 {/* Empty state */}
-                {!loading && ratings.length === 0 && (
-                    <View className="bg-white rounded-3xl p-12 items-center border border-gray-100 shadow-sm mt-4">
-                        <View className="w-16 h-16 bg-amber-50 rounded-2xl items-center justify-center mb-4">
-                            <Star size={26} color="#f59e0b" fill="#f59e0b" />
-                        </View>
-                        <Text className="font-bold text-gray-400 text-[15px]">Sin calificaciones aún</Text>
-                        <Text className="text-gray-300 text-[13px] mt-1 text-center px-6">
-                            {isWorker
+                {!loading && !error && ratings.length === 0 && (
+                    <View className="mt-4">
+                        <EmptyState
+                            icon={<Star size={20} color={RATING_COLOR} fill={RATING_COLOR} />}
+                            title="Sin calificaciones aún"
+                            subtitle={isWorker
                                 ? 'Cuando un cliente califique tu trabajo, aparecerá aquí.'
                                 : 'Cuando completes un proyecto y califiques al trabajador, aparecerá aquí.'}
-                        </Text>
+                        />
                     </View>
                 )}
 
                 {/* Tarjetas */}
-                {!loading && ratings.map((r) => {
+                {!loading && !error && ratings.map((r) => {
                     // Para el trabajador, la "persona" es quien lo calificó (reviewer/cliente).
                     // Para el cliente, es el trabajador que calificó.
                     const person = isWorker ? r.reviewer : r.worker;
+                    const canOpenProfile = !isWorker && !!r.worker?.id;
                     return (
-                        <TouchableOpacity
+                        <Card
                             key={r.id}
-                            onPress={() => {
-                                if (!isWorker && r.worker?.id) {
-                                    navigation.navigate('WorkerDetail', { workerId: r.worker.id });
-                                }
-                            }}
-                            disabled={isWorker}
-                            className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3"
-                            activeOpacity={isWorker ? 1 : 0.85}
+                            padding="md"
+                            className="mb-3"
+                            onPress={canOpenProfile ? () => navigation.navigate('HomeTab', { screen: 'WorkerDetail', params: { workerId: r.worker.id } }) : undefined}
+                            accessibilityLabel={canOpenProfile ? `Ver perfil de ${person?.name || 'trabajador'}` : undefined}
                         >
                             {/* Persona info */}
                             <View className="flex-row items-center gap-3 mb-3">
@@ -164,7 +185,7 @@ export default function MyRatingsScreen({ navigation }) {
                                         />
                                     ) : (
                                         <View className="w-full h-full items-center justify-center">
-                                            <Text className="text-lg font-extrabold text-gray-300">
+                                            <Text className="text-lg font-extrabold text-muted">
                                                 {person?.name?.[0]?.toUpperCase()}
                                             </Text>
                                         </View>
@@ -172,18 +193,18 @@ export default function MyRatingsScreen({ navigation }) {
                                 </View>
 
                                 <View className="flex-1 min-w-0">
-                                    <Text className="font-extrabold text-[15px] text-[#111]" numberOfLines={1}>
+                                    <Text className="font-extrabold text-[15px] text-ink" numberOfLines={1}>
                                         {person?.name || (isWorker ? 'Cliente' : 'Trabajador')}
                                     </Text>
                                     {r.project?.city && (
                                         <View className="flex-row items-center gap-1 mt-0.5">
-                                            <MapPin size={11} color="#9ca3af" />
-                                            <Text className="text-[12px] text-gray-400">{r.project.city}</Text>
+                                            <MapPin size={11} color={ICON.muted} />
+                                            <Text className="text-[12px] text-muted">{r.project.city}</Text>
                                         </View>
                                     )}
                                 </View>
 
-                                <Text className="text-[11px] text-gray-300 font-medium flex-shrink-0">
+                                <Text className="text-[11px] text-muted font-medium flex-shrink-0">
                                     {new Date(r.createdAt).toLocaleDateString('es-CO', {
                                         day: 'numeric', month: 'short', year: 'numeric',
                                     })}
@@ -193,19 +214,19 @@ export default function MyRatingsScreen({ navigation }) {
                             {/* Estrellas + proyecto */}
                             <View className="flex-row items-center justify-between mb-2">
                                 <StarRow score={r.score} />
-                                <Text className="text-[11px] font-semibold text-gray-400 max-w-[55%] text-right" numberOfLines={1}>
+                                <Text className="text-[11px] font-semibold text-muted max-w-[55%] text-right" numberOfLines={1}>
                                     {r.project?.title}
                                 </Text>
                             </View>
 
                             {/* Comentario */}
                             {r.comment && (
-                                <View className="flex-row items-start gap-2 mt-2 pt-2 border-t border-gray-50">
-                                    <MessageSquare size={13} color="#d1d5db" style={{ marginTop: 2 }} />
-                                    <Text className="flex-1 text-[13px] text-gray-500 leading-relaxed">{r.comment}</Text>
+                                <View className="flex-row items-start gap-2 mt-2 pt-2 border-t border-border">
+                                    <MessageSquare size={13} color={ICON.mutedLight} style={{ marginTop: 2 }} />
+                                    <Text className="flex-1 text-[13px] text-muted leading-relaxed">{r.comment}</Text>
                                 </View>
                             )}
-                        </TouchableOpacity>
+                        </Card>
                     );
                 })}
             </ScrollView>

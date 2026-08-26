@@ -5,6 +5,8 @@ import {
   getFavoriteServices, toggleFavoriteService,
   getFavoriteWorkers, toggleFavoriteWorker
 } from '../utils/favorites'
+import { Card } from '../components/ui'
+import { EmptyState } from '../components/common'
 
 /* ─── Imágenes únicas por categoría de servicio ─────────────────── */
 const SERVICE_IMAGES = {
@@ -52,18 +54,18 @@ export default function FavoritesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] page-enter px-4 sm:px-6 lg:px-10 xl:px-16">
+    <div className="min-h-screen bg-background page-enter px-4 sm:px-6 lg:px-10 xl:px-16">
 
       {/* Header */}
-      <div className="bg-white px-4 sm:px-6 lg:px-10 xl:px-16 pt-14 pb-4 border-b border-gray-100 sticky top-0 z-10">
-        <h2 className="text-[20px] font-extrabold text-[#111] mb-4">Favoritos</h2>
+      <div className="bg-surface px-4 sm:px-6 lg:px-10 xl:px-16 pt-14 pb-4 border-b border-border sticky top-0 z-10">
+        <h2 className="text-[20px] font-extrabold text-ink mb-4">Favoritos</h2>
 
         {/* Tabs */}
         <div className="flex gap-2">
           <button
             onClick={() => setTab('services')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all
-              ${tab === 'services' ? 'bg-[#E8432D] text-white shadow-md shadow-[#E8432D]/25' : 'bg-gray-100 text-gray-500'}`}
+              ${tab === 'services' ? 'bg-brand text-white shadow-md shadow-brand/25' : 'bg-gray-100 text-muted'}`}
           >
             <Briefcase size={14} />
             Trabajos
@@ -77,7 +79,7 @@ export default function FavoritesPage() {
           <button
             onClick={() => setTab('workers')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[13px] font-bold transition-all
-              ${tab === 'workers' ? 'bg-[#E8432D] text-white shadow-md shadow-[#E8432D]/25' : 'bg-gray-100 text-gray-500'}`}
+              ${tab === 'workers' ? 'bg-brand text-white shadow-md shadow-brand/25' : 'bg-gray-100 text-muted'}`}
           >
             <User size={14} />
             Trabajadores
@@ -97,27 +99,24 @@ export default function FavoritesPage() {
         {tab === 'services' && (
           <>
             {services.length === 0 ? (
-              <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4">
-                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Briefcase size={24} className="text-[#E8432D]" />
-                </div>
-                <p className="font-bold text-gray-400 text-[15px]">Sin trabajos favoritos</p>
-                <p className="text-gray-300 text-[13px] mt-1">Guarda servicios para acceder rápido.</p>
-                <button
-                  onClick={() => navigate('/services')}
-                  className="mt-4 px-5 py-2.5 bg-[#E8432D] text-white rounded-xl text-[13px] font-bold"
-                >
-                  Explorar servicios
-                </button>
+              <div className="mt-4 lg:col-span-2">
+                <EmptyState
+                  icon={<Briefcase size={20} className="text-brand" />}
+                  title="Sin trabajos favoritos"
+                  subtitle="Guarda servicios para acceder rápido."
+                  action="Explorar servicios"
+                  onAction={() => navigate('/services')}
+                />
               </div>
             ) : services.map((svc) => {
               const img = SERVICE_IMAGES[svc.category] || SERVICE_IMAGES.otro
               const label = svc.name
               return (
-                <div
+                <Card
                   key={svc.id}
+                  padding="sm"
                   onClick={() => navigate(`/quote?serviceId=${svc.id}&serviceName=${encodeURIComponent(svc.name)}&serviceCategory=${encodeURIComponent(svc.category || '')}`)}
-                  className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100 cursor-pointer active:scale-[.99] transition-transform"
+                  className="flex items-center gap-3 cursor-pointer active:scale-[.99] transition-transform"
                 >
                   <img
                     src={img}
@@ -125,16 +124,21 @@ export default function FavoritesPage() {
                     className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[15px] text-[#111] truncate">{label}</p>
+                    <p className="font-bold text-[15px] text-ink truncate">{label}</p>
                   </div>
+                  {/* Botón de solo-ícono con corazón "relleno" — se mantiene fuera de
+                      IconButton porque este primitivo no expone un paso-through de
+                      props (`fill`) hacia el ícono, y perder el relleno rompería la
+                      señal visual de "ya es favorito". Solo se tokeniza el color. */}
                   <button
                     type="button"
+                    aria-label={`Quitar ${label} de favoritos`}
                     onClick={(e) => { e.stopPropagation(); removeService(svc) }}
-                    className="w-9 h-9 rounded-xl bg-red-50 text-[#E8432D] flex items-center justify-center flex-shrink-0"
+                    className="w-9 h-9 rounded-xl bg-red-50 text-brand flex items-center justify-center flex-shrink-0"
                   >
                     <Heart size={16} fill="currentColor" />
                   </button>
-                </div>
+                </Card>
               )
             })}
           </>
@@ -144,24 +148,25 @@ export default function FavoritesPage() {
         {tab === 'workers' && (
           <>
             {workers.length === 0 ? (
-              <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm mt-4">
-                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <User size={24} className="text-[#E8432D]" />
-                </div>
-                <p className="font-bold text-gray-400 text-[15px]">Sin trabajadores favoritos</p>
-                <p className="text-gray-300 text-[13px] mt-1 leading-tight">Cuando veas un trabajador que te guste, guárdalo con el corazón ♡.</p>
+              <div className="mt-4 lg:col-span-2">
+                <EmptyState
+                  icon={<User size={20} className="text-brand" />}
+                  title="Sin trabajadores favoritos"
+                  subtitle="Cuando veas un trabajador que te guste, guárdalo con el corazón ♡."
+                />
               </div>
             ) : workers.map((w) => (
-              <div
+              <Card
                 key={w.id}
+                padding="sm"
                 onClick={() => navigate(`/worker/${w.id}`)}
-                className="bg-white rounded-2xl p-3 flex items-center gap-3 shadow-sm border border-gray-100 cursor-pointer active:scale-[.99] transition-transform"
+                className="flex items-center gap-3 cursor-pointer active:scale-[.99] transition-transform"
               >
                 {/* Avatar */}
                 <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 bg-gray-100">
                   {w.avatar
                     ? <img src={w.avatar} alt={w.name} className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-2xl font-extrabold text-gray-300">
+                    : <div className="w-full h-full flex items-center justify-center text-2xl font-extrabold text-muted">
                         {w.name?.[0]?.toUpperCase()}
                       </div>
                   }
@@ -169,30 +174,32 @@ export default function FavoritesPage() {
 
                 {/* Info */}
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-[15px] text-[#111] truncate">{w.name}</p>
+                  <p className="font-bold text-[15px] text-ink truncate">{w.name}</p>
                   {w.city && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin size={11} className="text-gray-400" />
-                      <span className="text-[12px] text-gray-400">{w.city}</span>
+                      <MapPin size={11} className="text-muted" />
+                      <span className="text-[12px] text-muted">{w.city}</span>
                     </div>
                   )}
                   {w.rating_avg && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <Star size={11} className="fill-[#E8432D] stroke-none" />
-                      <span className="text-[12px] font-bold text-[#111]">{w.rating_avg}</span>
-                      <span className="text-[11px] text-gray-400">({w.rating_count ?? 0})</span>
+                      <Star size={11} className="fill-brand stroke-none" />
+                      <span className="text-[12px] font-bold text-ink">{w.rating_avg}</span>
+                      <span className="text-[11px] text-muted">({w.rating_count ?? 0})</span>
                     </div>
                   )}
                 </div>
 
+                {/* Ver nota sobre IconButton arriba (mismo motivo: fill del corazón). */}
                 <button
                   type="button"
+                  aria-label={`Quitar ${w.name} de favoritos`}
                   onClick={(e) => { e.stopPropagation(); removeWorker(w) }}
-                  className="w-9 h-9 rounded-xl bg-red-50 text-[#E8432D] flex items-center justify-center flex-shrink-0"
+                  className="w-9 h-9 rounded-xl bg-red-50 text-brand flex items-center justify-center flex-shrink-0"
                 >
                   <Heart size={16} fill="currentColor" />
                 </button>
-              </div>
+              </Card>
             ))}
           </>
         )}

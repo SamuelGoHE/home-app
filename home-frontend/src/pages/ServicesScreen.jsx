@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, Heart, Search, Star, Filter } from 'lucide-react'
 import { useServices } from '../hooks/useApi'
 import { CardSkeleton, ErrorState, EmptyState } from '../components/common'
+import { IconButton } from '../components/ui'
 import { getFavoriteServices, toggleFavoriteService } from '../utils/favorites'
 
 /* ─── Mapa de categorías ─────────────────────────────────────────── */
@@ -80,34 +81,31 @@ export default function ServicesScreen() {
   }
 
   return (
-    <div className="bg-[#f8f9fb] min-h-screen page-enter flex flex-col">
+    <div className="bg-background min-h-screen page-enter flex flex-col">
       {/* ── Header fijo ── */}
-      <div className="bg-white sticky top-0 z-20 border-b border-gray-100 pb-2">
+      <div className="bg-surface sticky top-0 z-20 border-b border-border pb-2">
         <div className="flex items-center gap-3 px-4 sm:px-6 lg:px-10 xl:px-16 pt-12 pb-2">
-          <button onClick={() => navigate('/home')}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors">
-            <ArrowLeft size={18} className="text-gray-600" />
-          </button>
+          <IconButton icon={ArrowLeft} aria-label="Volver al inicio" onClick={() => navigate('/home')} />
           <div className="flex-1">
-            <h2 className="text-[18px] font-extrabold text-[#111] leading-tight">Explorar</h2>
-            <p className="text-[12px] text-gray-400 font-medium">Servicios disponibles</p>
+            <h2 className="text-[18px] font-extrabold text-ink leading-tight">Explorar</h2>
+            <p className="text-[12px] text-muted font-medium">Servicios disponibles</p>
           </div>
         </div>
 
         {/* ── Búsqueda ── */}
         <div className="px-4 sm:px-6 lg:px-10 xl:px-16 pb-3">
-          <div className="flex items-center gap-2.5 bg-gray-50/80 border border-gray-100 rounded-2xl px-4 py-3
-                          focus-within:border-[#E8432D] focus-within:bg-white transition-all">
-            <Search size={17} className="text-gray-400 flex-shrink-0" />
-            <input 
-              type="text" 
-              value={search} 
+          <div className="flex items-center gap-2.5 bg-gray-50/80 border border-border rounded-2xl px-4 py-3
+                          focus-within:border-brand focus-within:bg-white transition-all">
+            <Search size={17} className="text-muted flex-shrink-0" aria-hidden="true" />
+            <input
+              type="text"
+              value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar reparación, pintura, etc..."
-              className="flex-1 bg-transparent outline-none text-[14px] font-medium placeholder-gray-400 text-[#111]" 
+              className="flex-1 bg-transparent outline-none text-[14px] font-medium placeholder-gray-400 text-ink"
             />
             {search && (
-              <button onClick={() => setSearch('')} className="text-gray-400 hover:text-gray-600 text-lg leading-none">×</button>
+              <button onClick={() => setSearch('')} aria-label="Limpiar búsqueda" className="text-muted hover:text-gray-600 text-lg leading-none">×</button>
             )}
           </div>
         </div>
@@ -117,8 +115,8 @@ export default function ServicesScreen() {
           <button
             onClick={() => setSearchParams({})}
             className={`flex-shrink-0 px-4 py-2 rounded-2xl text-[13px] font-bold transition-all border
-              ${!activeCategory 
-                ? 'bg-[#E8432D] text-white border-[#E8432D] shadow-[0_4px_12px_rgba(232,67,45,0.25)]' 
+              ${!activeCategory
+                ? 'bg-brand text-white border-brand shadow-[0_4px_12px_rgba(232,67,45,0.25)]'
                 : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
           >
             Todos
@@ -130,8 +128,8 @@ export default function ServicesScreen() {
               <button key={cat}
                 onClick={() => setCategory(cat)}
                 className={`flex-shrink-0 px-4 py-2 rounded-2xl text-[13px] font-bold capitalize transition-all border flex items-center gap-1.5
-                  ${isActive 
-                    ? 'bg-[#E8432D] text-white border-[#E8432D] shadow-[0_4px_12px_rgba(232,67,45,0.25)]' 
+                  ${isActive
+                    ? 'bg-brand text-white border-brand shadow-[0_4px_12px_rgba(232,67,45,0.25)]'
                     : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}
               >
                 {cat.replace('_', ' ')}
@@ -182,13 +180,16 @@ export default function ServicesScreen() {
                 <img src={img} alt="" className="w-full h-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                 
-                {/* Botón Favorito */}
+                {/* Botón Favorito — reskineado a mano (no IconButton: necesita
+                    `fill` dinámico en el ícono, que IconButton no expone),
+                    pero conserva el mínimo táctil 44×44 del design system. */}
                 <button
                   type="button"
+                  aria-label={isFav ? `Quitar ${svc.name} de favoritos` : `Agregar ${svc.name} a favoritos`}
                   onClick={(e) => handleToggleFavorite(svc, e)}
-                  className="absolute top-3 right-3 w-9 h-9 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 transition-transform active:scale-90"
+                  className="absolute top-1.5 right-1.5 w-11 h-11 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 transition-transform active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2"
                 >
-                  <Heart size={18} className={isFav ? 'text-[#E8432D] fill-[#E8432D]' : 'text-white'} />
+                  <Heart size={18} className={isFav ? 'text-brand fill-brand' : 'text-white'} aria-hidden="true" />
                 </button>
 
                 {/* Info sobre imagen */}

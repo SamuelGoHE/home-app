@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Send, Loader2 } from 'lucide-react'
+import { ArrowLeft, Send } from 'lucide-react'
 import { useAuthStore } from '../context/authStore'
 import { useChat } from '../hooks/useChat'
 import { useProjects } from '../hooks/useApi'
+import { EmptyState } from '../components/common'
+import { IconButton, LoadingState } from '../components/ui'
 
 export default function ChatScreen() {
   const { projectId } = useParams()
@@ -47,37 +49,27 @@ export default function ChatScreen() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8f9fb] page-enter">
+    <div className="flex flex-col h-screen bg-background page-enter">
       {/* ── Header ── */}
-      <div className="bg-white px-5 pt-14 pb-4 flex items-center gap-3 border-b border-gray-100 flex-shrink-0 z-10 shadow-sm">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 active:scale-95 transition-all"
-        >
-          <ArrowLeft size={18} />
-        </button>
+      <div className="bg-surface px-5 pt-14 pb-4 flex items-center gap-3 border-b border-border flex-shrink-0 z-10 shadow-sm">
+        <IconButton icon={ArrowLeft} aria-label="Volver" onClick={() => navigate(-1)} />
         <div>
-          <h1 className="font-extrabold text-[16px] text-[#111] leading-tight">{counterpartyName}</h1>
-          <p className="text-[12px] text-gray-400 font-medium">{project?.service?.name || 'Chat del Proyecto'}</p>
+          <h1 className="font-extrabold text-[16px] text-ink leading-tight">{counterpartyName}</h1>
+          <p className="text-[12px] text-muted font-medium">{project?.service?.name || 'Chat del Proyecto'}</p>
         </div>
       </div>
 
       {/* ── Área de Mensajes ── */}
       <div className="flex-1 overflow-y-auto px-5 pt-6 pb-6 space-y-4">
         {loading ? (
-          <div className="h-full flex flex-col items-center justify-center text-gray-400">
-            <Loader2 size={24} className="animate-spin mb-2 text-[#E8432D]" />
-            <p className="text-[13px] font-medium">Cargando historial...</p>
-          </div>
+          <LoadingState message="Cargando historial..." className="h-full" />
         ) : messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-4">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-3">
-              <span className="text-2xl">👋</span>
-            </div>
-            <h3 className="font-bold text-[16px] text-[#111] mb-1">Aún no hay mensajes</h3>
-            <p className="text-[13px] text-gray-400 leading-relaxed">
-              Escribe un mensaje para comenzar la conversación sobre este proyecto.
-            </p>
+          <div className="h-full flex items-center justify-center">
+            <EmptyState
+              icon="👋"
+              title="Aún no hay mensajes"
+              subtitle="Escribe un mensaje para comenzar la conversación sobre este proyecto."
+            />
           </div>
         ) : (
           messages.map((msg, idx) => {
@@ -88,27 +80,27 @@ export default function ChatScreen() {
             const isMine = senderId === user?.id
 
             return (
-              <div 
-                key={msg.id || idx} 
+              <div
+                key={msg.id || idx}
                 className={`flex flex-col ${isMine ? 'items-end' : 'items-start'} max-w-[85%] ${isMine ? 'ml-auto' : 'mr-auto'}`}
               >
                 {!isMine && msg.sender?.name && (
-                  <span className="text-[10px] font-bold text-gray-400 ml-2 mb-1">
+                  <span className="text-[10px] font-bold text-muted ml-2 mb-1">
                     {msg.sender.name.split(' ')[0]}
                   </span>
                 )}
-                <div 
+                <div
                   className={`px-4 py-3 rounded-2xl ${
-                    isMine 
-                      ? 'bg-gradient-to-br from-[#E8432D] to-[#f97316] text-white rounded-br-sm shadow-md shadow-[#E8432D]/20' 
-                      : 'bg-white border border-gray-100 text-[#111] rounded-bl-sm shadow-sm'
+                    isMine
+                      ? 'bg-brand text-white rounded-br-sm shadow-md shadow-brand/20'
+                      : 'bg-surface border border-border text-ink rounded-bl-sm shadow-sm'
                   }`}
                 >
                   <p className="text-[14px] leading-snug break-words">
                     {msg.text}
                   </p>
                 </div>
-                <span className={`text-[10px] font-medium text-gray-400 mt-1 ${isMine ? 'mr-1' : 'ml-1'}`}>
+                <span className={`text-[10px] font-medium text-muted mt-1 ${isMine ? 'mr-1' : 'ml-1'}`}>
                   {new Date(msg.createdAt || msg.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
@@ -119,25 +111,26 @@ export default function ChatScreen() {
       </div>
 
       {/* ── Input Area ── */}
-      <div className="bg-white border-t border-gray-100 p-4 pb-safe flex-shrink-0">
-        <form 
+      <div className="bg-surface border-t border-border p-4 pb-safe flex-shrink-0">
+        <form
           onSubmit={handleSend}
-          className="flex items-center gap-2 bg-[#f8f9fb] rounded-full p-1.5 border border-gray-100 focus-within:border-[#E8432D] focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)] transition-all"
+          className="flex items-center gap-2 bg-background rounded-full p-1.5 border border-border focus-within:border-brand focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)] transition-all"
         >
           <input
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder="Escribe un mensaje..."
-            className="flex-1 bg-transparent px-4 text-[14px] outline-none text-[#111]"
+            className="flex-1 bg-transparent px-4 text-[14px] outline-none text-ink"
           />
-          <button 
+          <IconButton
+            icon={Send}
             type="submit"
             disabled={!inputText.trim()}
-            className="w-10 h-10 rounded-full bg-[#E8432D] text-white flex items-center justify-center flex-shrink-0 active:scale-90 transition-transform disabled:opacity-50 disabled:bg-gray-300 disabled:active:scale-100"
-          >
-            <Send size={16} className="ml-1" />
-          </button>
+            aria-label="Enviar mensaje"
+            variant="solid"
+            className="!bg-brand !border-brand !text-white"
+          />
         </form>
       </div>
     </div>

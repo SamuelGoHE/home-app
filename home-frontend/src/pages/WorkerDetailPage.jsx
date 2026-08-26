@@ -1,8 +1,10 @@
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, MapPin, Shield, Phone, MessageCircle } from 'lucide-react'
+import { ArrowLeft, MapPin, Shield, Phone, MessageCircle, CalendarDays, FileSignature } from 'lucide-react'
 import { useWorker } from '../hooks/useApi'
 import { useAuthStore } from '../context/authStore'
 import toast from 'react-hot-toast'
+import { Button, IconButton, LoadingState } from '../components/ui'
+import { EmptyState } from '../components/common'
 
 const SERVICE_MAP = {
   pintura:            { label: 'Pintura Interior' },
@@ -40,16 +42,19 @@ export default function WorkerDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <span className="w-8 h-8 border-4 border-[#E8432D]/30 border-t-[#E8432D] rounded-full animate-spin" />
+        <LoadingState />
       </div>
     )
   }
 
   if (!worker) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-white">
-        <p className="text-gray-400">Trabajador no encontrado</p>
-        <button onClick={() => navigate(-1)} className="text-[#E8432D] font-semibold">Volver</button>
+      <div className="min-h-screen flex items-center justify-center bg-white p-5">
+        <EmptyState
+          title="Trabajador no encontrado"
+          action="Volver"
+          onAction={() => navigate(-1)}
+        />
       </div>
     )
   }
@@ -74,7 +79,8 @@ export default function WorkerDetailPage() {
       return
     }
 
-    // Pasar todos los datos necesarios para crear la solicitud en CalendarScreen
+    // Pasar todos los datos necesarios para crear la solicitud en CalendarScreen,
+    // incluidas las tarifas fijas del trabajador para mostrarlas ahí.
     const params = new URLSearchParams({
       workerId: worker.id,
       serviceId,
@@ -85,6 +91,9 @@ export default function WorkerDetailPage() {
       sq_meters: sqMeters,
       occupied,
       notes,
+      workerPricingModes: (profile.pricing_modes || []).join(','),
+      workerDailyRate: profile.daily_rate || '',
+      workerContractNote: profile.contract_pricing_note || '',
     })
     navigate(`/calendar?${params.toString()}`)
   }
@@ -97,10 +106,13 @@ export default function WorkerDetailPage() {
           <img src={worker.avatar || 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop'} alt={worker.name} className="w-full h-full object-cover object-top" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
         </div>
-        <button onClick={() => navigate(-1)}
-          className="absolute top-14 left-5 w-9 h-9 flex items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-          <ArrowLeft size={18} color="white" />
-        </button>
+        <IconButton
+          icon={ArrowLeft}
+          variant="ghost"
+          aria-label="Volver"
+          className="absolute top-14 left-5 !rounded-xl !bg-white/20 !text-white backdrop-blur-sm hover:!bg-white/30"
+          onClick={() => navigate(-1)}
+        />
         <div className="absolute bottom-4 left-5 right-5">
           <div className="flex items-end justify-between">
             <div>
@@ -129,7 +141,7 @@ export default function WorkerDetailPage() {
           { label: 'Años exp.',    value: yearsExp },
         ].map(s => (
           <div key={s.label} className="flex-1 py-4 text-center border-r border-gray-100 last:border-0">
-            <p className="text-[17px] font-extrabold text-[#111]">{s.value}</p>
+            <p className="text-[17px] font-extrabold text-ink">{s.value}</p>
             <p className="text-[11px] text-gray-400 mt-0.5">{s.label}</p>
           </div>
         ))}
@@ -137,14 +149,39 @@ export default function WorkerDetailPage() {
 
       {/* Bio + Especialidades */}
       <div className="px-5 py-5 flex-1">
-        <h3 className="font-bold text-[15px] text-[#111] mb-2">Sobre mí</h3>
+        <h3 className="font-bold text-[15px] text-ink mb-2">Sobre mí</h3>
         <p className="text-sm text-gray-500 leading-relaxed">{profile.bio || 'Profesional dedicado y comprometido con la excelencia.'}</p>
+
+        {/* Cómo cobra este trabajador */}
+        {profile.pricing_modes?.length > 0 && (
+          <div className="mt-5 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Cómo cobra</p>
+            <div className="flex flex-wrap gap-2">
+              {profile.pricing_modes.includes('por_dia') && (
+                <span className="flex items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5 text-[12px] font-bold text-ink">
+                  <CalendarDays size={13} className="text-brand" />
+                  Por día{profile.daily_rate ? ` · $${Number(profile.daily_rate).toLocaleString('es-CO')}` : ''}
+                </span>
+              )}
+              {profile.pricing_modes.includes('por_contrato') && (
+                <span className="flex items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5 text-[12px] font-bold text-ink">
+                  <FileSignature size={13} className="text-brand" />
+                  Por contrato
+                </span>
+              )}
+            </div>
+            {profile.pricing_modes.includes('por_contrato') && profile.contract_pricing_note && (
+              <p className="text-[12px] text-gray-500 mt-2 leading-relaxed">{profile.contract_pricing_note}</p>
+            )}
+            <p className="text-[11px] text-gray-400 mt-2">Precio fijo del trabajador — sin negociación.</p>
+          </div>
+        )}
 
         {/* Servicio solicitado */}
         {serviceName && serviceName !== 'Servicio' && (
           <div className="mt-4 bg-orange-50 rounded-2xl px-4 py-3 border border-orange-100">
             <p className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-0.5">Servicio a contratar</p>
-            <p className="text-[14px] font-bold text-[#111]">{decodeURIComponent(serviceName)}</p>
+            <p className="text-[14px] font-bold text-ink">{decodeURIComponent(serviceName)}</p>
             {city && <p className="text-[12px] text-gray-500 mt-0.5">📍 {city} {address && `· ${address}`}</p>}
           </div>
         )}
@@ -162,7 +199,7 @@ export default function WorkerDetailPage() {
                 return (
                   <div
                     key={key}
-                    className={`px-4 py-3 text-[14px] font-semibold text-[#111] bg-white ${
+                    className={`px-4 py-3 text-[14px] font-semibold text-ink bg-white ${
                       !isLast ? 'border-b border-gray-50' : ''
                     }`}
                   >
@@ -175,30 +212,39 @@ export default function WorkerDetailPage() {
         )}
 
         <div className="flex gap-3 mt-6">
-          <button
+          {/* Llamar/Chat: funcionalidad simulada (solo toast) — se preserva tal
+              cual, solo se reskinea con el componente Button del design system. */}
+          <Button
+            variant="secondary"
+            fullWidth
+            aria-label="Llamar"
+            className="!bg-gray-100 !border-0 !rounded-2xl !text-gray-600 hover:!bg-gray-200"
             onClick={() => toast('Contrata a este profesional para ver su teléfono', { icon: '📞' })}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl text-[14px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
           >
             <Phone size={16} /> Llamar
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
+            fullWidth
+            aria-label="Chat"
+            className="!bg-gray-100 !border-0 !rounded-2xl !text-gray-600 hover:!bg-gray-200"
             onClick={() => toast('Inicia el proyecto primero para chatear', { icon: '💬' })}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl text-[14px] font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
           >
             <MessageCircle size={16} /> Chat
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* CTA */}
       <div className="px-5 pb-10 pt-2">
-        <button
-          onClick={handleConfirm}
+        <Button
+          variant="primary"
+          fullWidth
           disabled={loading}
-          className="w-full py-4 bg-[#E8432D] text-white rounded-full text-[17px] font-bold disabled:opacity-50 hover:opacity-90 active:scale-[.98] transition-all"
+          onClick={handleConfirm}
         >
           {loading ? 'Cargando...' : `Contratar a ${worker.name.split(' ')[0]}`}
-        </button>
+        </Button>
         <p className="text-center text-[12px] text-gray-400 mt-2">
           Elegirás las fechas en el siguiente paso
         </p>

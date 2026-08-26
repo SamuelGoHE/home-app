@@ -5,6 +5,7 @@ import { useAuthStore } from '../context/authStore'
 import { useServices, useProjects } from '../hooks/useApi'
 import { useNotifications } from '../hooks/useNotifications'
 import { RowSkeleton, CardSkeleton, StatusBadge } from '../components/common'
+import { IconButton, Card } from '../components/ui'
 import { getFavoriteServices, toggleFavoriteService } from '../utils/favorites'
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel'
 
@@ -34,7 +35,7 @@ function Avatar({ user }) {
   }
   const initials = user?.name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
   return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#E8432D] to-[#f97316] flex items-center justify-center shadow-sm">
+    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand to-orange-500 flex items-center justify-center shadow-sm">
       <span className="text-white text-[13px] font-bold">{initials}</span>
     </div>
   )
@@ -51,7 +52,7 @@ function Categories({ services, onSelect }) {
           <button key={svc.category} onClick={() => onSelect(svc.category)}
             className="flex-none w-[110px] snap-start flex flex-col items-center gap-2.5 group">
             <div className="w-full aspect-square rounded-3xl overflow-hidden ring-2 ring-transparent
-                            group-hover:ring-[#E8432D] group-active:scale-95 transition-all duration-150 shadow-sm">
+                            group-hover:ring-brand group-active:scale-95 transition-all duration-150 shadow-sm">
               <img src={img} alt={svc.category}
                 onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMG }}
                 className="w-full h-full object-cover" />
@@ -81,13 +82,15 @@ function ServiceCard({ svc, isFav, onToggleFav }) {
           className="w-full h-24 object-cover" />
         <button type="button"
           onClick={e => { e.stopPropagation(); onToggleFav(svc) }}
+          aria-label={isFav ? 'Quitar de favoritos' : 'Agregar a favoritos'}
+          aria-pressed={isFav}
           className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 backdrop-blur-sm
                      flex items-center justify-center shadow-sm border border-white/50">
-          <span className={`text-[13px] ${isFav ? 'opacity-100' : 'opacity-40'}`}>❤️</span>
+          <span aria-hidden="true" className={`text-[13px] ${isFav ? 'opacity-100' : 'opacity-40'}`}>❤️</span>
         </button>
       </div>
       <div className="px-3 py-2.5">
-        <p className="font-bold text-[13px] text-[#111] truncate">{svc.name}</p>
+        <p className="font-bold text-[13px] text-ink truncate">{svc.name}</p>
         <p className="text-[11px] text-gray-400 capitalize mt-0.5">
           {svc.category.replace('_', ' ')}
         </p>
@@ -104,26 +107,29 @@ function ProjectCard({ project }) {
   const pct = tasks.length ? Math.round((done / tasks.length) * 100) : 0
 
   return (
-    <div onClick={() => navigate(`/projects/${project.id}`)}
-      className="ui-card p-4 cursor-pointer active:scale-[.98] transition-transform">
+    <Card
+      padding="sm"
+      onClick={() => navigate(`/projects/${project.id}`)}
+      className="cursor-pointer active:scale-[.98] transition-transform"
+    >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-[14px] text-[#111] truncate">{project.title || project.service?.name || 'Proyecto'}</p>
+          <p className="font-bold text-[14px] text-ink truncate">{project.title || project.service?.name || 'Proyecto'}</p>
           <p className="text-[12px] text-gray-400 mt-0.5">{project.service?.name}</p>
         </div>
         <StatusBadge status={project.status} />
       </div>
       {tasks.length > 0 && (
         <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-1">
-          <div className="h-full bg-gradient-to-r from-[#E8432D] to-[#f97316] rounded-full transition-all duration-500"
+          <div className="h-full bg-gradient-to-r from-brand to-orange-500 rounded-full transition-all duration-500"
             style={{ width: `${pct}%` }} />
         </div>
       )}
-      <div className="flex items-center gap-1 mt-3 text-[#E8432D]">
+      <div className="flex items-center gap-1 mt-3 text-brand">
         <span className="text-[12px] font-semibold">Ver detalle</span>
-        <ChevronRight size={13} />
+        <ChevronRight size={13} aria-hidden="true" />
       </div>
-    </div>
+    </Card>
   )
 }
 
@@ -174,24 +180,35 @@ export default function HomeScreen() {
             <Avatar user={user} />
             <div className="min-w-0">
               <p className="text-[12px] text-gray-400 font-medium">{greeting},</p>
-              <p className="text-[16px] font-extrabold text-[#111] leading-tight truncate">{firstName} 👋</p>
+              <p className="text-[16px] font-extrabold text-ink leading-tight truncate">{firstName} 👋</p>
             </div>
           </div>
-          <button id="btn-home-notifications" onClick={() => setIsNotifOpen(true)}
-            className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 border border-gray-100 active:scale-95 transition-transform">
-            <Bell size={18} strokeWidth={1.8} className="text-gray-600" />
-            {hasUnreadNotifs && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E8432D] rounded-full border-2 border-white" />}
-          </button>
+          <div className="relative">
+            <IconButton
+              id="btn-home-notifications"
+              icon={Bell}
+              variant="solid"
+              aria-label="Notificaciones"
+              onClick={() => setIsNotifOpen(true)}
+            />
+            {hasUnreadNotifs && (
+              <span
+                aria-hidden="true"
+                className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand rounded-full border-2 border-white pointer-events-none"
+              />
+            )}
+          </div>
         </div>
 
         <div className="overflow-y-auto no-scrollbar pb-24">
           {/* ── Barra de búsqueda ── */}
           <div className="px-4 sm:px-6 pt-4 pb-4">
             <div className="flex items-center gap-2.5 bg-white border-2 border-gray-100 rounded-2xl px-4 py-3
-                            focus-within:border-[#E8432D] focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)] transition-all">
-              <Search size={17} className="text-gray-400 flex-shrink-0" />
+                            focus-within:border-brand focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)] transition-all">
+              <Search size={17} className="text-gray-400 flex-shrink-0" aria-hidden="true" />
               <input id="input-home-search" type="text" value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="Buscar servicio..." className="flex-1 bg-transparent outline-none text-[14px] font-medium text-[#111]" />
+                aria-label="Buscar servicio"
+                placeholder="Buscar servicio..." className="flex-1 bg-transparent outline-none text-[14px] font-medium text-ink" />
             </div>
 
             {search && (
@@ -204,7 +221,7 @@ export default function HomeScreen() {
                         onError={e => { e.currentTarget.onerror = null; e.currentTarget.src = PLACEHOLDER_IMG }}
                         className="w-10 h-10 rounded-xl object-cover" />
                       <div className="text-left flex-1 min-w-0">
-                        <p className="text-[14px] font-semibold text-[#111] truncate">{s.name}</p>
+                        <p className="text-[14px] font-semibold text-ink truncate">{s.name}</p>
                         <p className="text-[11px] text-gray-400 capitalize">{s.category.replace('_', ' ')}</p>
                       </div>
                     </button>
@@ -223,10 +240,10 @@ export default function HomeScreen() {
                 <div className="px-4 sm:px-6 pb-8">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <TrendingUp size={15} className="text-[#E8432D]" />
-                      <h2 className="text-[15px] font-extrabold text-[#111]">Proyectos activos</h2>
+                      <TrendingUp size={15} className="text-brand" />
+                      <h2 className="text-[15px] font-extrabold text-ink">Proyectos activos</h2>
                     </div>
-                    <button onClick={() => navigate('/projects')} className="text-[12px] text-[#E8432D] font-semibold flex items-center gap-0.5 hover:underline">
+                    <button onClick={() => navigate('/projects')} className="text-[12px] text-brand font-semibold flex items-center gap-0.5 hover:underline">
                       Ver todos <ChevronRight size={13} />
                     </button>
                   </div>
@@ -240,10 +257,10 @@ export default function HomeScreen() {
               <div className="pb-8">
                 <div className="flex items-center justify-between px-4 sm:px-6 mb-3">
                   <div className="flex items-center gap-2">
-                    <Zap size={15} className="text-[#E8432D]" />
-                    <h2 className="text-[15px] font-extrabold text-[#111]">Categorías</h2>
+                    <Zap size={15} className="text-brand" />
+                    <h2 className="text-[15px] font-extrabold text-ink">Categorías</h2>
                   </div>
-                  <button onClick={() => navigate('/services')} className="text-[12px] text-[#E8432D] font-semibold hover:underline">
+                  <button onClick={() => navigate('/services')} className="text-[12px] text-brand font-semibold hover:underline">
                     Ver todas
                   </button>
                 </div>
@@ -254,10 +271,10 @@ export default function HomeScreen() {
               <div className="pb-8">
                 <div className="flex items-center justify-between px-4 sm:px-6 mb-3">
                   <div className="flex items-center gap-2">
-                    <Star size={15} className="text-[#E8432D]" />
-                    <h2 className="text-[15px] font-extrabold text-[#111]">Más solicitados</h2>
+                    <Star size={15} className="text-brand" />
+                    <h2 className="text-[15px] font-extrabold text-ink">Más solicitados</h2>
                   </div>
-                  <button onClick={() => navigate('/services?sort=popular')} className="text-[12px] text-[#E8432D] font-semibold hover:underline">
+                  <button onClick={() => navigate('/services?sort=popular')} className="text-[12px] text-brand font-semibold hover:underline">
                     Ver todas
                   </button>
                 </div>
@@ -280,13 +297,13 @@ export default function HomeScreen() {
 
               {/* ── Banner CTA ── */}
               <div className="px-4 sm:px-6 mb-2">
-                <div className="bg-gradient-to-r from-[#E8432D] to-[#f97316] rounded-3xl px-4 sm:px-6 py-8 relative overflow-hidden">
+                <div className="bg-gradient-to-r from-brand to-orange-500 rounded-3xl px-4 sm:px-6 py-8 relative overflow-hidden">
                   <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full" />
                   <div className="absolute -right-2 top-8 w-14 h-14 bg-white/10 rounded-full" />
                   <h3 className="text-white font-extrabold text-[18px] mb-1 relative z-10">¿Tienes un proyecto?</h3>
                   <p className="text-white/90 text-[13px] mb-5 relative z-10">Solicita una cotización gratis y recibe propuestas.</p>
                   <button onClick={() => navigate('/services')}
-                    className="relative z-10 bg-white text-[#E8432D] rounded-full px-6 py-3 text-[14px] font-extrabold active:scale-95 transition-all shadow-lg">
+                    className="relative z-10 bg-white text-brand rounded-full px-6 py-3 text-[14px] font-extrabold active:scale-95 transition-all shadow-lg">
                     Cotizar ahora →
                   </button>
                 </div>

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, MessageCircle, Mail, Phone, ExternalLink, ShieldQuestion } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../context/authStore'
+import { IconButton } from '../components/ui'
 
 export default function WorkerSupport() {
   const navigate = useNavigate()
@@ -13,16 +14,17 @@ export default function WorkerSupport() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex justify-center overflow-x-hidden font-outfit">
-      <div className="w-full max-w-[480px] bg-[#f8f9fb] min-h-screen shadow-2xl relative flex flex-col animate-fade-in">
+      <div className="w-full max-w-[480px] bg-background min-h-screen shadow-2xl relative flex flex-col animate-fade-in">
         
         {/* ── HEADER ROJO ── */}
-        <div className="bg-[#E8432D] pt-16 pb-24 px-6 text-center relative">
-          <button 
-            onClick={() => navigate(-1)} 
-            className="absolute top-12 left-6 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md text-white flex items-center justify-center active:scale-90 transition-transform"
-          >
-            <ArrowLeft size={20} />
-          </button>
+        <div className="bg-brand pt-16 pb-24 px-6 text-center relative">
+          <IconButton
+            icon={ArrowLeft}
+            variant="ghost"
+            aria-label="Volver"
+            className="absolute top-12 left-6 !bg-white/20 !text-white backdrop-blur-md active:scale-90"
+            onClick={() => navigate(-1)}
+          />
 
           <div className="w-20 h-20 bg-white rounded-[28px] mx-auto shadow-2xl flex items-center justify-center overflow-hidden border-4 border-white/20 mb-4">
             <div className="w-full h-full bg-blue-50 flex items-center justify-center text-blue-500">
@@ -38,7 +40,7 @@ export default function WorkerSupport() {
           <div className="bg-white rounded-[40px] p-8 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-gray-50 space-y-10">
             
             <div className="text-center">
-              <h2 className="text-xl font-black text-[#111]">¿Tienes un inconveniente con un proyecto?</h2>
+              <h2 className="text-xl font-black text-ink">¿Tienes un inconveniente con un proyecto?</h2>
               <p className="text-sm text-gray-400 font-medium mt-2">Selecciona tu canal preferido de atención</p>
             </div>
 
@@ -93,13 +95,13 @@ export default function WorkerSupport() {
                 <ShieldQuestion size={20} />
               </div>
               <div>
-                <p className="text-[13px] font-black text-[#111]">¿Duda sobre la plataforma?</p>
+                <p className="text-[13px] font-black text-ink">¿Duda sobre la plataforma?</p>
                 <p className="text-[12px] text-gray-500 mt-1 leading-relaxed">
                   Antes de contactarnos, revisa el Centro de Ayuda donde resolvemos las dudas más frecuentes.
                 </p>
                 <button 
                   onClick={() => navigate('/worker/help')}
-                  className="mt-3 text-[11px] font-black text-[#E8432D] uppercase tracking-widest hover:underline"
+                  className="mt-3 text-[11px] font-black text-brand uppercase tracking-widest hover:underline"
                 >
                   Ver Preguntas Frecuentes
                 </button>

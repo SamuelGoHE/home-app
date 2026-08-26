@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, MessageCircle, Mail, Phone, ChevronDown, FileText, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, MessageCircle, Mail, ChevronDown, AlertTriangle, ShieldCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { IconButton, Card } from '../components/ui'
 
 const FAQS = [
   {
@@ -31,26 +32,21 @@ export default function HelpCenterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] page-enter flex flex-col">
+    <div className="min-h-screen bg-background page-enter flex flex-col">
       {/* ── Header ── */}
-      <div className="bg-white px-5 pt-14 pb-4 flex items-center gap-3 border-b border-gray-100 sticky top-0 z-10">
-        <button
-          onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-100 active:scale-95 transition-all"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <h1 className="font-extrabold text-[17px] text-[#111]">Centro de ayuda</h1>
+      <div className="bg-surface px-5 pt-14 pb-4 flex items-center gap-3 border-b border-border sticky top-0 z-10">
+        <IconButton icon={ArrowLeft} aria-label="Volver" onClick={() => navigate(-1)} />
+        <h1 className="font-extrabold text-[17px] text-ink">Centro de ayuda</h1>
       </div>
 
       <div className="flex-1 px-5 pt-6 pb-12 overflow-y-auto">
 
         {/* ── Banner ── */}
-        <div className="bg-gradient-to-br from-[#E8432D] to-[#f97316] rounded-3xl p-6 mb-8 text-white shadow-md shadow-[#E8432D]/20 text-center relative overflow-hidden">
+        <div className="bg-gradient-to-br from-brand to-orange-500 rounded-3xl p-6 mb-8 text-white shadow-md shadow-brand/20 text-center relative overflow-hidden">
           <div className="absolute -right-6 -top-6 w-24 h-24 bg-white/10 rounded-full blur-xl" />
           <div className="relative z-10">
             <div className="w-14 h-14 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center mx-auto mb-3">
-              <MessageCircle size={28} className="text-white" />
+              <MessageCircle size={28} className="text-white" aria-hidden="true" />
             </div>
             <h2 className="text-[20px] font-extrabold leading-tight">¿En qué podemos ayudarte?</h2>
             <p className="text-[14px] text-white/90 mt-1 font-medium">Estamos aquí para resolver tus dudas</p>
@@ -64,22 +60,22 @@ export default function HelpCenterPage() {
         <div className="grid grid-cols-2 gap-3 mb-8">
           <button
             onClick={() => handleAction('Abriendo WhatsApp...')}
-            className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"
+            className="bg-surface p-4 rounded-3xl border border-border shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"
           >
             <div className="w-12 h-12 rounded-full bg-[#E8F9F4] text-[#0F6E56] flex items-center justify-center">
-              <MessageCircle size={22} />
+              <MessageCircle size={22} aria-hidden="true" />
             </div>
-            <span className="font-bold text-[14px] text-[#111]">WhatsApp</span>
+            <span className="font-bold text-[14px] text-ink">WhatsApp</span>
           </button>
 
           <button
             onClick={() => handleAction('Abriendo gestor de correos...')}
-            className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"
+            className="bg-surface p-4 rounded-3xl border border-border shadow-sm flex flex-col items-center justify-center gap-2 active:scale-95 transition-all"
           >
             <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center">
-              <Mail size={22} />
+              <Mail size={22} aria-hidden="true" />
             </div>
-            <span className="font-bold text-[14px] text-[#111]">Correo</span>
+            <span className="font-bold text-[14px] text-ink">Correo</span>
           </button>
         </div>
 
@@ -87,7 +83,7 @@ export default function HelpCenterPage() {
         <h3 className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-3 ml-2">
           Preguntas Frecuentes
         </h3>
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+        <Card padding="none" className="overflow-hidden mb-8">
           {FAQS.map((faq, idx) => {
             const isOpen = openFaq === idx
             return (
@@ -95,13 +91,15 @@ export default function HelpCenterPage() {
                 <button
                   onClick={() => setOpenFaq(isOpen ? null : idx)}
                   className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50/50 transition-colors"
+                  aria-expanded={isOpen}
                 >
-                  <span className={`font-semibold text-[14px] pr-4 ${isOpen ? 'text-[#E8432D]' : 'text-[#111]'}`}>
+                  <span className={`font-semibold text-[14px] pr-4 ${isOpen ? 'text-brand' : 'text-ink'}`}>
                     {faq.question}
                   </span>
                   <ChevronDown
                     size={18}
-                    className={`flex-shrink-0 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-[#E8432D]' : ''}`}
+                    className={`flex-shrink-0 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-brand' : ''}`}
+                    aria-hidden="true"
                   />
                 </button>
                 {isOpen && (
@@ -114,21 +112,21 @@ export default function HelpCenterPage() {
               </div>
             )
           })}
-        </div>
+        </Card>
 
         {/* ── Seguridad y Legal ── */}
         <h3 className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mb-3 ml-2">
           Seguridad y Legal
         </h3>
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-4">
+        <Card padding="none" className="overflow-hidden mb-4">
           <button
             onClick={() => handleAction('Iniciando proceso de reporte...')}
             className="w-full flex items-center gap-4 px-4 py-4 border-b border-gray-50 hover:bg-gray-50/80 active:bg-gray-100 transition-colors"
           >
             <div className="w-9 h-9 rounded-2xl flex items-center justify-center bg-orange-50 text-orange-500 flex-shrink-0">
-              <AlertTriangle size={18} />
+              <AlertTriangle size={18} aria-hidden="true" />
             </div>
-            <span className="flex-1 text-left font-semibold text-[15px] text-[#111]">Reportar un problema</span>
+            <span className="flex-1 text-left font-semibold text-[15px] text-ink">Reportar un problema</span>
           </button>
 
           <button
@@ -136,11 +134,11 @@ export default function HelpCenterPage() {
             className="w-full flex items-center gap-4 px-4 py-4 hover:bg-gray-50/80 active:bg-gray-100 transition-colors"
           >
             <div className="w-9 h-9 rounded-2xl flex items-center justify-center bg-gray-50 text-gray-500 flex-shrink-0">
-              <ShieldCheck size={18} />
+              <ShieldCheck size={18} aria-hidden="true" />
             </div>
-            <span className="flex-1 text-left font-semibold text-[15px] text-[#111]">Términos y Políticas</span>
+            <span className="flex-1 text-left font-semibold text-[15px] text-ink">Términos y Políticas</span>
           </button>
-        </div>
+        </Card>
 
       </div>
     </div>

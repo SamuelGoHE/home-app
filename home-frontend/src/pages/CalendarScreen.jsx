@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Calendar as CalendarIcon, CheckCircle2, Send } from 'lucide-react'
+import { ArrowLeft, Calendar as CalendarIcon, Send, CalendarDays, FileSignature } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
-import { format, startOfMonth, getDaysInMonth, getDay, addMonths, isBefore, isAfter, isEqual } from 'date-fns'
+import { format, startOfMonth, getDaysInMonth, getDay, addMonths, isBefore, isEqual } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { Button, IconButton, Card } from '../components/ui'
 
 /* ─── Utilidades ─────────────────────────────────────────────────── */
 const TODAY = new Date()
@@ -14,7 +15,6 @@ export default function CalendarScreen() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [startDate, setStartDate] = useState(null)
-  const [endDate, setEndDate] = useState(null)
   const [loading, setLoading] = useState(false)
 
   // Datos del trabajador y del servicio (vienen de WorkerDetailPage)
@@ -26,31 +26,31 @@ export default function CalendarScreen() {
   const sqMeters       = searchParams.get('sq_meters') || ''
   const occupied       = searchParams.get('occupied') === 'true'
   const notes          = searchParams.get('notes') || ''
+  const workerPricingModes = (searchParams.get('workerPricingModes') || '').split(',').filter(Boolean)
+  const workerDailyRate    = searchParams.get('workerDailyRate') || ''
+  const workerContractNote = searchParams.get('workerContractNote') || ''
+
+  const hasPricing = workerPricingModes.length > 0
+
+  // Si el trabajador solo ofrece una modalidad, se preselecciona; si ofrece ambas, el cliente elige.
+  const [pricingType, setPricingType] = useState(workerPricingModes[0] || null)
+
+  // Por día hay una tarifa fija; por contrato no hay un número — el trabajador cotiza al aceptar.
+  const modeReady = pricingType === 'por_dia' ? !!workerDailyRate : (pricingType === 'por_contrato' ? !!workerContractNote : false)
+  const canSubmit = !!startDate && hasPricing && modeReady && !loading
 
   const months = useMemo(() => [TODAY, addMonths(TODAY, 1), addMonths(TODAY, 2)], [])
 
+  // Tocar un día lo selecciona; tocar el mismo día lo deselecciona. Solo se elige fecha de inicio:
+  // la duración del trabajo la define el profesional una vez revisa el trabajo.
   const selectDay = (date) => {
-    if (!startDate || (startDate && endDate)) {
-      setStartDate(date); setEndDate(null)
-    } else {
-      if (isBefore(date, startDate)) { setEndDate(startDate); setStartDate(date) }
-      else if (isEqual(date, startDate)) { setStartDate(null) }
-      else setEndDate(date)
-    }
+    setStartDate(prev => (prev && isEqual(date, prev) ? null : date))
   }
 
-  const getState = (date) => {
-    if (!startDate) return 'none'
-    if (isEqual(date, startDate)) return 'start'
-    if (endDate && isEqual(date, endDate)) return 'end'
-    if (endDate && isAfter(date, startDate) && isBefore(date, endDate)) return 'range'
-    return 'none'
-  }
-
-  const formatLabel = (d) => d ? format(d, "EEE d, MMM", { locale: es }) : 'Seleccionar'
+  const formatLabel = (d) => d ? format(d, "EEEE d 'de' MMMM", { locale: es }) : 'Toca un día en el calendario'
 
   const handleConfirm = async () => {
-    if (!startDate) return
+    if (!canSubmit) return
     if (!workerId || !serviceId) {
       toast.error('Faltan datos del servicio. Vuelve a seleccionar el trabajador.')
       navigate(-1)
@@ -59,8 +59,7 @@ export default function CalendarScreen() {
 
     setLoading(true)
     try {
-      // ── CREAR LA SOLICITUD DIRIGIDA AL TRABAJADOR ──
-      const res = await api.post('/quotes', {
+      await api.post('/quotes', {
         service_id: serviceId,
         worker_id: workerId,
         city,
@@ -69,7 +68,7 @@ export default function CalendarScreen() {
         occupied,
         notes,
         start_date: format(startDate, 'yyyy-MM-dd'),
-        end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+        pricing_type: pricingType,
       })
 
       toast.success('¡Solicitud enviada! El profesional te responderá pronto.', {
@@ -86,89 +85,148 @@ export default function CalendarScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fb] flex flex-col page-enter">
+    <div className="min-h-screen bg-background flex flex-col page-enter">
       {/* ── Header ── */}
-      <div className="bg-white sticky top-0 z-20 border-b border-gray-100 pb-2 shadow-sm">
+      <div className="bg-surface sticky top-0 z-20 border-b border-border pb-2 shadow-sm">
         <div className="flex items-center gap-3 px-5 pt-12 pb-2">
-          <button onClick={() => navigate(-1)}
-            className="w-9 h-9 flex items-center justify-center rounded-xl bg-gray-50 border border-gray-100 hover:bg-gray-100 transition-colors">
-            <ArrowLeft size={18} className="text-gray-600" />
-          </button>
+          <IconButton icon={ArrowLeft} aria-label="Volver" onClick={() => navigate(-1)} />
           <div className="flex-1 min-w-0">
-            <h2 className="text-[18px] font-extrabold text-[#111] leading-tight">¿Cuándo lo necesitas?</h2>
-            <p className="text-[12px] text-gray-400 font-medium">Selecciona las fechas del servicio</p>
+            <h2 className="text-[18px] font-extrabold text-ink leading-tight">¿Cuándo lo necesitas?</h2>
+            <p className="text-[12px] text-muted font-medium">Selecciona la fecha de inicio del servicio</p>
           </div>
-          <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-red-50 text-[#E8432D]">
-            <CalendarIcon size={18} />
+          <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <CalendarIcon size={18} aria-hidden="true" />
           </div>
         </div>
 
         {/* Resumen del servicio */}
         {serviceName && serviceName !== 'Servicio' && (
-          <div className="mx-5 mb-2 px-3 py-2 bg-orange-50 rounded-xl border border-orange-100 flex items-center gap-2">
-            <span className="text-sm font-bold text-[#E8432D] truncate">{decodeURIComponent(serviceName)}</span>
-            {city && <span className="text-[11px] text-gray-400 flex-shrink-0">· {city}</span>}
+          <div className="mx-5 mb-2 px-3 py-2 bg-brand-soft rounded-xl border border-orange-100 flex items-center gap-2">
+            <span className="text-sm font-bold text-brand truncate">{decodeURIComponent(serviceName)}</span>
+            {city && <span className="text-[11px] text-muted flex-shrink-0">· {city}</span>}
           </div>
         )}
-
-        {/* Weekday header */}
-        <div className="grid grid-cols-7 px-5 mt-2">
-          {['D','L','M','M','J','V','S'].map((d,i) => (
-            <div key={i} className="text-center text-gray-400 text-[11px] font-bold uppercase pb-2">{d}</div>
-          ))}
-        </div>
       </div>
 
-      {/* ── Calendar grid ── */}
+      {/* ── Contenido ── */}
       <div className="flex-1 overflow-y-auto px-5 pt-4 pb-32">
+        {/* ── Modalidad de cobro y tarifa fija — arriba de todo, no hay que buscarla ── */}
+        <Card padding="lg" className="mb-6">
+          <h3 className="font-bold text-[15px] text-ink mb-1">¿Cómo quieres cotizar?</h3>
+
+          {!hasPricing ? (
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+              <p className="text-[13px] font-bold text-amber-700">Este trabajador todavía no configuró sus tarifas</p>
+              <p className="text-[12px] text-amber-600 mt-1">No podrás enviar la solicitud hasta que publique un precio fijo.</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-[12px] text-muted mb-4">Este es el precio fijo que el trabajador cobra — no hay que ofertar.</p>
+
+              {workerPricingModes.length > 1 && (
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  {[
+                    { key: 'por_dia', label: 'Por día', icon: CalendarDays },
+                    { key: 'por_contrato', label: 'Por contrato', icon: FileSignature },
+                  ].map(({ key, label, icon: Icon }) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setPricingType(key)}
+                      aria-pressed={pricingType === key}
+                      className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 transition-all
+                        ${pricingType === key ? 'border-brand bg-brand-soft text-brand' : 'border-border text-muted'}`}
+                    >
+                      <Icon size={18} aria-hidden="true" />
+                      <span className="text-[12px] font-bold">{label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {pricingType === 'por_dia' ? (
+                <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
+                  <span className="text-[12px] font-bold text-muted uppercase tracking-wide">Precio por día</span>
+                  <span className="text-[20px] font-black text-ink">
+                    {workerDailyRate ? `$${Number(workerDailyRate).toLocaleString('es-CO')}` : '—'}
+                  </span>
+                </div>
+              ) : (
+                <div className="p-4 bg-gray-50 rounded-2xl">
+                  <span className="text-[12px] font-bold text-muted uppercase tracking-wide block mb-1.5">Cómo cotiza este trabajo</span>
+                  {workerContractNote ? (
+                    <p className="text-[13px] font-semibold text-ink leading-relaxed">{workerContractNote}</p>
+                  ) : (
+                    <p className="text-[13px] font-semibold text-amber-600">Este trabajador aún no describió cómo cotiza sus contratos</p>
+                  )}
+                  <p className="text-[11px] text-muted mt-2">El precio final te lo confirmará el trabajador después de revisar tu solicitud.</p>
+                </div>
+              )}
+            </>
+          )}
+        </Card>
+
+        {/* ── Calendar grid ── */}
         {months.map((month, mi) => (
-          <div key={mi} className="mb-6 bg-white rounded-3xl p-4 shadow-sm border border-gray-100">
+          <Card padding="md" key={mi} className="mb-6">
             <div className="flex justify-between items-center mb-4 px-1">
-              <span className="font-extrabold text-[15px] text-[#111] capitalize">
+              <span className="font-extrabold text-[15px] text-ink capitalize">
                 {format(month, 'MMMM', { locale: es })}
               </span>
-              <span className="text-gray-400 text-[13px] font-semibold">{format(month, 'yyyy')}</span>
+              <span className="text-muted text-[13px] font-semibold">{format(month, 'yyyy')}</span>
             </div>
-            <MonthGrid month={month} getState={getState} onSelect={selectDay} />
-          </div>
+            <div className="grid grid-cols-7 px-1 mb-1">
+              {['D','L','M','M','J','V','S'].map((d,i) => (
+                <div key={i} className="text-center text-muted text-[11px] font-bold uppercase pb-2">{d}</div>
+              ))}
+            </div>
+            <MonthGrid month={month} selectedDate={startDate} onSelect={selectDay} />
+          </Card>
         ))}
       </div>
 
       {/* ── Footer CTA ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 p-5 pb-8 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-        <div className="flex items-center justify-between mb-4 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-          <DateBadge label="Inicio" value={formatLabel(startDate)} active={!!startDate} />
-          <div className="w-8 h-px bg-gray-300" />
-          <DateBadge label="Fin" value={formatLabel(endDate)} right active={!!endDate} />
+      <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-border p-5 pb-8 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        <div className="flex items-center gap-3 mb-4 bg-gray-50 p-3 rounded-2xl border border-border">
+          <div className="w-9 h-9 rounded-xl bg-brand-soft flex items-center justify-center flex-shrink-0">
+            <CalendarIcon size={16} className="text-brand" aria-hidden="true" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-[10px] font-bold text-muted uppercase tracking-wide block mb-0.5">Fecha de inicio</span>
+            <span className={`text-[14px] font-bold capitalize truncate block ${startDate ? 'text-ink' : 'text-muted'}`}>
+              {formatLabel(startDate)}
+            </span>
+          </div>
         </div>
 
-        <button
+        <Button
+          variant="primary"
+          fullWidth
+          loading={loading}
+          disabled={!canSubmit}
           onClick={handleConfirm}
-          disabled={!startDate || loading}
-          className="w-full flex items-center justify-center gap-2 py-4 bg-[#E8432D] text-white rounded-2xl text-[16px] font-extrabold disabled:opacity-40 disabled:bg-gray-300 hover:opacity-90 active:scale-[.98] transition-all shadow-[0_4px_16px_rgba(232,67,45,0.3)]"
+          aria-label="Enviar solicitud al trabajador"
+          className="!text-[16px]"
         >
-          {loading ? (
+          {loading ? 'Enviando solicitud...' : (
             <>
-              <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Enviando solicitud...
-            </>
-          ) : (
-            <>
-              <Send size={18} strokeWidth={2.5} />
+              <Send size={18} strokeWidth={2.5} aria-hidden="true" />
               Enviar solicitud al trabajador
             </>
           )}
-        </button>
+        </Button>
 
-        <p className="text-center text-[11px] text-gray-400 mt-2">
-          El trabajador aceptará o rechazará tu solicitud
+        <p className="text-center text-[11px] text-muted mt-2">
+          {hasPricing
+            ? 'El trabajador aceptará o rechazará tu solicitud'
+            : 'Este trabajador aún no tiene tarifas configuradas'}
         </p>
       </div>
     </div>
   )
 }
 
-function MonthGrid({ month, getState, onSelect }) {
+function MonthGrid({ month, selectedDate, onSelect }) {
   const firstDay = getDay(startOfMonth(month))
   const days = getDaysInMonth(month)
 
@@ -178,29 +236,20 @@ function MonthGrid({ month, getState, onSelect }) {
       {Array.from({ length: days }).map((_, i) => {
         const date = new Date(month.getFullYear(), month.getMonth(), i + 1)
         const isPast = isBefore(date, TODAY)
-        const state = getState(date)
+        const isSelected = selectedDate && isEqual(date, selectedDate)
 
         return (
           <div key={i} className="relative aspect-square flex items-center justify-center">
-            {state === 'range' && (
-              <div className="absolute inset-y-0 -inset-x-1 bg-[#FFF4F2] z-0" />
-            )}
-            {(state === 'start' && !!getState(new Date(date.getTime() + 86400000)).match(/range|end/)) && (
-              <div className="absolute inset-y-0 right-0 left-1/2 bg-[#FFF4F2] z-0" />
-            )}
-            {(state === 'end' && !!getState(new Date(date.getTime() - 86400000)).match(/range|start/)) && (
-              <div className="absolute inset-y-0 left-0 right-1/2 bg-[#FFF4F2] z-0" />
-            )}
-
             <button
               onClick={() => !isPast && onSelect(date)}
               disabled={isPast}
+              aria-pressed={isSelected}
+              aria-label={format(date, "d 'de' MMMM", { locale: es })}
               className={`
                 w-9 h-9 flex items-center justify-center text-[14px] font-semibold relative z-10 transition-all rounded-full
                 ${isPast ? 'text-gray-300 cursor-default' : 'cursor-pointer'}
-                ${state === 'start' || state === 'end' ? 'text-white bg-[#E8432D] shadow-md transform scale-105' : ''}
-                ${state === 'range' ? 'text-[#E8432D] font-bold' : ''}
-                ${state === 'none' && !isPast ? 'text-[#111] hover:bg-gray-100' : ''}
+                ${isSelected ? 'text-white bg-brand shadow-md transform scale-105' : ''}
+                ${!isSelected && !isPast ? 'text-ink hover:bg-gray-100' : ''}
               `}
             >
               {i + 1}
@@ -208,17 +257,6 @@ function MonthGrid({ month, getState, onSelect }) {
           </div>
         )
       })}
-    </div>
-  )
-}
-
-function DateBadge({ label, value, right, active }) {
-  return (
-    <div className={`flex flex-col flex-1 ${right ? 'items-end text-right' : 'items-start text-left'}`}>
-      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">{label}</span>
-      <span className={`text-[13px] font-bold capitalize ${active ? 'text-[#E8432D]' : 'text-gray-400'}`}>
-        {value}
-      </span>
     </div>
   )
 }

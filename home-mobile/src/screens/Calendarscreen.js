@@ -1,22 +1,37 @@
 import React, { useState, useMemo } from 'react';
 import {
-    View, Text, ScrollView, TouchableOpacity,
-    ActivityIndicator, Alert,
+    View, Text, ScrollView, Pressable,
+    Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Calendar as CalendarIcon, Send } from 'lucide-react-native';
+import {
+    ArrowLeft, Calendar as CalendarIcon, Send,
+    CalendarDays, FileSignature,
+} from 'lucide-react-native';
 import {
     format, startOfMonth, getDaysInMonth, getDay,
     addMonths, isBefore, isEqual,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import api from '../services/api';
+import { Button, IconButton, BackButton, Card } from '../components/ui';
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 const TODAY = new Date();
 TODAY.setHours(0, 0, 0, 0);
 
 const DAY_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+
+/**
+ * Colores literales necesarios para props `color` de lucide-react-native
+ * (los íconos SVG no aceptan clases de Tailwind). Cada uno coincide
+ * exactamente con el token homónimo de design-system/tokens.js.
+ */
+const ICON = {
+    muted: '#6b7280',
+    brand: '#E8432D',
+    surface: '#ffffff',
+};
 
 /* ─── MonthGrid ──────────────────────────────────────────────────── */
 function MonthGrid({ month, selectedDate, onSelect }) {
@@ -57,17 +72,20 @@ function MonthGrid({ month, selectedDate, onSelect }) {
                             if (!date) return <View key={ci} className="flex-1" />;
 
                             const isPast = isBefore(date, TODAY);
-                            const isSelected = selectedDate && isEqual(date, selectedDate);
+                            const isSelected = !!(selectedDate && isEqual(date, selectedDate));
 
                             return (
                                 <View key={ci} className="flex-1 items-center">
-                                    <TouchableOpacity
+                                    <Pressable
                                         onPress={() => !isPast && onSelect(date)}
                                         disabled={isPast}
-                                        className={`w-9 h-9 items-center justify-center rounded-full ${isSelected ? 'bg-[#E8432D]' : ''
+                                        accessibilityRole="button"
+                                        accessibilityLabel={format(date, "d 'de' MMMM", { locale: es })}
+                                        accessibilityState={{ selected: isSelected, disabled: isPast }}
+                                        className={`w-9 h-9 items-center justify-center rounded-full ${isSelected ? 'bg-brand' : ''
                                             }`}
                                         style={isSelected
-                                            ? { shadowColor: '#E8432D', shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }
+                                            ? { shadowColor: ICON.brand, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }
                                             : undefined
                                         }
                                     >
@@ -76,12 +94,12 @@ function MonthGrid({ month, selectedDate, onSelect }) {
                                                     ? 'text-gray-300'
                                                     : isSelected
                                                         ? 'text-white'
-                                                        : 'text-[#111]'
+                                                        : 'text-ink'
                                                 }`}
                                         >
                                             {date.getDate()}
                                         </Text>
-                                    </TouchableOpacity>
+                                    </Pressable>
                                 </View>
                             );
                         })}
@@ -96,7 +114,8 @@ function MonthGrid({ month, selectedDate, onSelect }) {
    CALENDAR SCREEN — el cliente elige solo la fecha de inicio;
    la duración del trabajo la define el profesional.
    Params: { workerId, serviceId, serviceName, city, address,
-             sq_meters, occupied, notes }
+             sq_meters, occupied, notes,
+             workerPricingModes, workerDailyRate, workerContractRate }
 ══════════════════════════════════════════════════════════════════ */
 export default function CalendarScreen({ route, navigation }) {
     const {
@@ -108,10 +127,20 @@ export default function CalendarScreen({ route, navigation }) {
         sq_meters = '',
         occupied = false,
         notes = '',
+        workerPricingModes = [],
+        workerDailyRate = '',
+        workerContractNote = '',
     } = route.params || {};
+
+    const hasPricing = workerPricingModes.length > 0;
 
     const [startDate, setStartDate] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [pricingType, setPricingType] = useState(workerPricingModes[0] || null);
+
+    // Por día hay una tarifa fija; por contrato no hay un número — el trabajador cotiza al aceptar.
+    const modeReady = pricingType === 'por_dia' ? !!workerDailyRate : (pricingType === 'por_contrato' ? !!workerContractNote : false);
+    const canSubmit = !!startDate && hasPricing && modeReady && !loading;
 
     const months = useMemo(
         () => [TODAY, addMonths(TODAY, 1), addMonths(TODAY, 2)],
@@ -124,7 +153,7 @@ export default function CalendarScreen({ route, navigation }) {
     };
 
     const handleConfirm = async () => {
-        if (!startDate) return;
+        if (!canSubmit) return;
         if (!workerId || !serviceId) {
             Alert.alert('Error', 'Faltan datos del servicio. Vuelve a seleccionar el trabajador.');
             navigation.goBack();
@@ -142,7 +171,7 @@ export default function CalendarScreen({ route, navigation }) {
                 occupied,
                 notes,
                 start_date: format(startDate, 'yyyy-MM-dd'),
-                end_date: null,
+                pricing_type: pricingType,
             });
 
             // Ir directamente a los proyectos sin alert
@@ -156,38 +185,33 @@ export default function CalendarScreen({ route, navigation }) {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-[#f8f9fb]">
+        <SafeAreaView className="flex-1 bg-background">
 
             {/* ── Header ── */}
-            <View className="bg-white border-b border-gray-100 px-5 pt-2 pb-3">
+            <View className="bg-surface border-b border-border px-5 pt-2 pb-3">
                 <View className="flex-row items-center gap-3 mb-3">
-                    <TouchableOpacity
-                        onPress={() => navigation.goBack()}
-                        className="w-9 h-9 items-center justify-center rounded-xl bg-gray-50 border border-gray-100"
-                    >
-                        <ArrowLeft size={18} color="#4b5563" />
-                    </TouchableOpacity>
+                    <BackButton onPress={() => navigation.goBack()} />
                     <View className="flex-1">
-                        <Text className="text-[18px] font-extrabold text-[#111] leading-tight">
+                        <Text className="text-[18px] font-extrabold text-ink leading-tight">
                             ¿Cuándo lo necesitas?
                         </Text>
-                        <Text className="text-[12px] text-gray-400 font-medium">
+                        <Text className="text-[12px] text-muted font-medium">
                             Selecciona la fecha de inicio del servicio
                         </Text>
                     </View>
-                    <View className="w-9 h-9 items-center justify-center rounded-xl bg-red-50">
-                        <CalendarIcon size={18} color="#E8432D" />
+                    <View className="w-9 h-9 items-center justify-center rounded-xl bg-brand-soft">
+                        <CalendarIcon size={18} color={ICON.brand} />
                     </View>
                 </View>
 
                 {/* Resumen del servicio */}
                 {serviceName && serviceName !== 'Servicio' && (
-                    <View className="flex-row items-center gap-2 px-3 py-2 bg-orange-50 rounded-xl border border-orange-100">
-                        <Text className="text-[13px] font-bold text-[#E8432D] flex-1" numberOfLines={1}>
+                    <View className="flex-row items-center gap-2 px-3 py-2 bg-brand-soft rounded-xl border border-orange-100">
+                        <Text className="text-[13px] font-bold text-brand flex-1" numberOfLines={1}>
                             {serviceName}
                         </Text>
                         {city ? (
-                            <Text className="text-[11px] text-gray-400 flex-shrink-0">· {city}</Text>
+                            <Text className="text-[11px] text-muted flex-shrink-0">· {city}</Text>
                         ) : null}
                     </View>
                 )}
@@ -199,34 +223,112 @@ export default function CalendarScreen({ route, navigation }) {
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingBottom: 160 }}
             >
+                {/* ── Modalidad de cobro y tarifa fija — arriba de todo, no hay que buscarla ── */}
+                <Card padding="lg" className="mb-4">
+                    <Text className="font-bold text-[15px] text-ink mb-1">¿Cómo quieres cotizar?</Text>
+
+                    {!hasPricing ? (
+                        <View className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                            <Text className="text-[13px] font-bold text-amber-700">
+                                Este trabajador todavía no configuró sus tarifas
+                            </Text>
+                            <Text className="text-[12px] text-amber-600 mt-1">
+                                No podrás enviar la solicitud hasta que publique un precio fijo.
+                            </Text>
+                        </View>
+                    ) : (
+                        <>
+                            <Text className="text-[12px] text-muted mb-4">
+                                Este es el precio fijo que el trabajador cobra — no hay que ofertar.
+                            </Text>
+
+                            {workerPricingModes.length > 1 && (
+                                <View className="flex-row gap-3 mb-4">
+                                    {[
+                                        { key: 'por_dia', label: 'Por día', Icon: CalendarDays },
+                                        { key: 'por_contrato', label: 'Por contrato', Icon: FileSignature },
+                                    ].map(({ key, label, Icon }) => {
+                                        const active = pricingType === key;
+                                        return (
+                                            <Pressable
+                                                key={key}
+                                                onPress={() => setPricingType(key)}
+                                                accessibilityRole="button"
+                                                accessibilityState={{ selected: active }}
+                                                className="flex-1 items-center gap-1.5 py-3 rounded-2xl border"
+                                                style={{
+                                                    borderColor: active ? ICON.brand : '#f3f4f6',
+                                                    backgroundColor: active ? '#fff7ed' : '#fff',
+                                                }}
+                                            >
+                                                <Icon size={18} color={active ? ICON.brand : '#9ca3af'} />
+                                                <Text className="text-[12px] font-bold" style={{ color: active ? ICON.brand : '#9ca3af' }}>
+                                                    {label}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
+                            )}
+
+                            {pricingType === 'por_dia' ? (
+                                <View className="p-4 bg-gray-50 rounded-2xl flex-row items-center justify-between">
+                                    <Text className="text-[12px] font-bold text-muted uppercase tracking-wide">Precio por día</Text>
+                                    <Text className="text-[20px] font-black text-ink">
+                                        {workerDailyRate ? `$${Number(workerDailyRate).toLocaleString('es-CO')}` : '—'}
+                                    </Text>
+                                </View>
+                            ) : (
+                                <View className="p-4 bg-gray-50 rounded-2xl">
+                                    <Text className="text-[12px] font-bold text-muted uppercase tracking-wide mb-1.5">
+                                        Cómo cotiza este trabajo
+                                    </Text>
+                                    {workerContractNote ? (
+                                        <Text className="text-[13px] font-semibold text-ink leading-relaxed">
+                                            {workerContractNote}
+                                        </Text>
+                                    ) : (
+                                        <Text className="text-[13px] font-semibold text-amber-600">
+                                            Este trabajador aún no describió cómo cotiza sus contratos
+                                        </Text>
+                                    )}
+                                    <Text className="text-[11px] text-muted mt-2">
+                                        El precio final te lo confirmará el trabajador después de revisar tu solicitud.
+                                    </Text>
+                                </View>
+                            )}
+                        </>
+                    )}
+                </Card>
+
                 {months.map((month, mi) => (
-                    <View key={mi} className="mb-4 bg-white rounded-3xl p-4 border border-gray-100">
+                    <Card padding="md" key={mi} className="mb-4">
                         <View className="flex-row justify-between items-center mb-4 px-1">
-                            <Text className="font-extrabold text-[15px] text-[#111] capitalize">
+                            <Text className="font-extrabold text-[15px] text-ink capitalize">
                                 {format(month, 'MMMM', { locale: es })}
                             </Text>
-                            <Text className="text-gray-400 text-[13px] font-semibold">
+                            <Text className="text-muted text-[13px] font-semibold">
                                 {format(month, 'yyyy')}
                             </Text>
                         </View>
                         <MonthGrid month={month} selectedDate={startDate} onSelect={selectDay} />
-                    </View>
+                    </Card>
                 ))}
             </ScrollView>
 
             {/* ── Footer CTA ── */}
-            <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 pt-4 pb-8">
+            <View className="absolute bottom-0 left-0 right-0 bg-surface border-t border-border px-5 pt-4 pb-8">
                 {/* Fecha seleccionada */}
-                <View className="flex-row items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-gray-100 mb-3">
-                    <View className="w-9 h-9 rounded-xl bg-red-50 items-center justify-center">
-                        <CalendarIcon size={16} color="#E8432D" />
+                <View className="flex-row items-center gap-3 bg-gray-50 rounded-2xl px-4 py-3 border border-border mb-3">
+                    <View className="w-9 h-9 rounded-xl bg-brand-soft items-center justify-center">
+                        <CalendarIcon size={16} color={ICON.brand} />
                     </View>
                     <View className="flex-1">
-                        <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-0.5">
+                        <Text className="text-[10px] font-bold text-muted uppercase tracking-wide mb-0.5">
                             Fecha de inicio
                         </Text>
                         <Text
-                            className={`text-[14px] font-bold capitalize ${startDate ? 'text-[#111]' : 'text-gray-400'}`}
+                            className={`text-[14px] font-bold capitalize ${startDate ? 'text-ink' : 'text-muted'}`}
                             numberOfLines={1}
                         >
                             {startDate
@@ -236,32 +338,28 @@ export default function CalendarScreen({ route, navigation }) {
                     </View>
                 </View>
 
-                <TouchableOpacity
+                <Button
+                    variant="primary"
+                    fullWidth
+                    loading={loading}
+                    disabled={!canSubmit}
                     onPress={handleConfirm}
-                    disabled={!startDate || loading}
-                    className="w-full flex-row items-center justify-center gap-2 py-4 bg-[#E8432D] rounded-2xl"
-                    style={{
-                        opacity: !startDate || loading ? 0.4 : 1,
-                        shadowColor: '#E8432D',
-                        shadowOpacity: 0.3,
-                        shadowRadius: 12,
-                        shadowOffset: { width: 0, height: 4 },
-                    }}
+                    accessibilityLabel="Enviar solicitud al trabajador"
                 >
-                    {loading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                    ) : (
+                    {loading ? null : (
                         <>
-                            <Send size={18} color="#fff" strokeWidth={2.5} />
+                            <Send size={18} color={ICON.surface} strokeWidth={2.5} />
                             <Text className="text-white font-extrabold text-[16px]">
                                 Enviar solicitud al trabajador
                             </Text>
                         </>
                     )}
-                </TouchableOpacity>
+                </Button>
 
-                <Text className="text-center text-[11px] text-gray-400 mt-2">
-                    El trabajador aceptará o rechazará tu solicitud
+                <Text className="text-center text-[11px] text-muted mt-2">
+                    {hasPricing
+                        ? 'El trabajador aceptará o rechazará tu solicitud'
+                        : 'Este trabajador aún no tiene tarifas configuradas'}
                 </Text>
             </View>
         </SafeAreaView>

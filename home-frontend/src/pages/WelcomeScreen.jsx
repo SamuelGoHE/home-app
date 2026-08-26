@@ -3,16 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import { useGoogleLogin } from '@react-oauth/google'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../context/authStore'
+import { Button } from '../components/ui'
 
 /* ─── Logo SVG ───────────────────────────────────────────────────── */
 const Logo = () => (
   <div className="flex items-center gap-2 mb-8">
     <svg viewBox="0 0 40 40" fill="none" className="w-10 h-10">
-      <rect width="40" height="40" rx="12" fill="#E8432D" />
+      <rect width="40" height="40" rx="12" className="fill-brand" />
       <path d="M8 30 L16 16 L24 24 L32 10" stroke="white" strokeWidth="3.5"
         strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-    <span className="text-2xl font-extrabold text-[#111] tracking-tight">HOME</span>
+    <span className="text-2xl font-extrabold text-ink tracking-tight">HOME</span>
   </div>
 )
 
@@ -33,13 +34,13 @@ const FacebookIcon = () => (
 )
 
 const AppleIcon = () => (
-  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#111">
+  <svg className="w-5 h-5 flex-shrink-0 fill-ink" viewBox="0 0 24 24">
     <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
   </svg>
 )
 
 const EmailIcon = () => (
-  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#E8432D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg className="w-5 h-5 flex-shrink-0 stroke-brand" viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="4" width="20" height="16" rx="2" />
     <path d="M2 7l10 7 10-7" />
   </svg>
@@ -48,21 +49,21 @@ const EmailIcon = () => (
 /* ─── Botón social reutilizable ──────────────────────────────────── */
 function SocialBtn({ icon, label, onClick, loading, disabled }) {
   return (
-    <button
+    <Button
       id={`btn-oauth-${label.replace(/\s+/g, '-').toLowerCase()}`}
+      type="button"
+      variant="secondary"
+      fullWidth
+      loading={loading}
+      disabled={disabled}
+      aria-label={label}
       onClick={onClick}
-      disabled={loading || disabled}
-      className="w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-gray-100 bg-white
-                 text-[15px] font-semibold text-[#111] shadow-sm
-                 hover:border-gray-300 hover:shadow-md active:scale-[.98]
-                 disabled:opacity-50 disabled:cursor-not-allowed
-                 transition-all duration-200 relative"
     >
-      {loading ? (
-        <span className="w-5 h-5 flex-shrink-0 border-2 border-gray-300 border-t-[#E8432D] rounded-full animate-spin" />
-      ) : icon}
-      <span>{loading ? 'Conectando...' : label}</span>
-    </button>
+      <span className="flex items-center gap-4">
+        {icon}
+        <span>{loading ? 'Conectando...' : label}</span>
+      </span>
+    </Button>
   )
 }
 
@@ -155,14 +156,14 @@ export default function WelcomeScreen() {
   const anyLoading = loadingProvider !== null
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-[#fff6f4] to-white page-enter">
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-brand-soft to-white page-enter">
       {/* ─ Hero ─ */}
       <div className="flex-1 px-7 pt-16 flex flex-col items-center">
         <Logo />
 
-        <h1 className="text-[28px] font-extrabold text-[#111] text-center mb-3 leading-tight">
+        <h1 className="text-[28px] font-extrabold text-ink text-center mb-3 leading-tight">
           Gestiona tu hogar<br />
-          <span className="text-[#E8432D]">como un profesional</span>
+          <span className="text-brand">como un profesional</span>
         </h1>
         <p className="text-[14px] text-gray-500 text-center mb-10 leading-relaxed max-w-xs">
           Cotizaciones, proyectos y trabajadores del hogar en un solo lugar.
@@ -224,7 +225,7 @@ export default function WelcomeScreen() {
           <button
             onClick={() => navigate('/login')}
             disabled={anyLoading}
-            className="font-bold text-[#E8432D] hover:underline disabled:opacity-40"
+            className="font-bold text-brand hover:underline disabled:opacity-40"
           >
             Inicia sesión
           </button>

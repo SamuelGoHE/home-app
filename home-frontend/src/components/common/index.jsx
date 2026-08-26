@@ -1,4 +1,6 @@
 import { AlertTriangle, Inbox } from 'lucide-react'
+import { getStatus } from '../../design-system/status.js'
+import { Badge } from '../ui/Badge.jsx'
 
 // Skeleton de tarjeta
 export function CardSkeleton({ className = '' }) {
@@ -26,7 +28,17 @@ export function EmptyState({ icon = '📭', title, subtitle, action, onAction })
   return (
     <div className="ui-card-soft flex flex-col items-center justify-center py-14 px-8 text-center">
       <div className="w-11 h-11 rounded-xl bg-white border border-gray-200 flex items-center justify-center mb-3">
-        {typeof icon === 'string' ? <Inbox size={20} className="text-gray-500" /> : icon}
+        {typeof icon === 'string' ? (
+          // Fix: antes esta rama nunca se alcanzaba en la práctica porque el
+          // chequeo de tipo caía siempre en <Inbox>, así que el emoji que
+          // cada pantalla pasaba (ej. icon="🔍" en ServicesScreen) nunca se
+          // renderizaba.
+          <span aria-hidden="true" className="text-xl leading-none">{icon}</span>
+        ) : icon != null ? (
+          icon
+        ) : (
+          <Inbox size={20} className="text-gray-500" />
+        )}
       </div>
       <h3 className="text-lg font-bold text-gray-800 mb-1">{title}</h3>
       {subtitle && <p className="text-sm text-gray-500 mb-6 max-w-xs">{subtitle}</p>}
@@ -62,28 +74,13 @@ export function ErrorState({ message, onRetry }) {
   )
 }
 
-// Badge de estado de proyecto
-const STATUS_CONFIG = {
-  pendiente:    { label: 'Pendiente',    bg: 'bg-gray-100',    text: 'text-gray-600' },
-  en_revision:  { label: 'En revisión',  bg: 'bg-yellow-100',  text: 'text-yellow-700' },
-  aprobado:     { label: 'Aprobado',     bg: 'bg-blue-100',    text: 'text-blue-700' },
-  en_progreso:  { label: 'En progreso',  bg: 'bg-orange-100',  text: 'text-orange-700' },
-  pausado:      { label: 'Pausado',      bg: 'bg-gray-100',    text: 'text-gray-500' },
-  completado:   { label: 'Completado',   bg: 'bg-green-100',   text: 'text-green-700' },
-  cancelado:    { label: 'Cancelado',    bg: 'bg-red-100',     text: 'text-red-600' },
-  // Tareas
-  en_progreso_t:{ label: 'En progreso',  bg: 'bg-orange-100',  text: 'text-orange-700' },
-  completada:   { label: 'Completada',   bg: 'bg-green-100',   text: 'text-green-700' },
-  bloqueada:    { label: 'Bloqueada',    bg: 'bg-red-100',     text: 'text-red-600' },
-}
-
+// Badge de estado de proyecto — la fuente de verdad del mapa vive ahora en
+// design-system/status.js (compartida conceptualmente con home-mobile) en
+// vez de un STATUS_CONFIG local. Mismo output visual que antes para los 10
+// estados ya en uso; ver design-system/status.js para el detalle de tonos.
 export function StatusBadge({ status }) {
-  const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.pendiente
-  return (
-    <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full ${cfg.bg} ${cfg.text}`}>
-      {cfg.label}
-    </span>
-  )
+  const { label, tone } = getStatus(status)
+  return <Badge tone={tone}>{label}</Badge>
 }
 
 // Badge de prioridad

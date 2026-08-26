@@ -1,11 +1,19 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react-native';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuthStore } from '../context/authStore';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import PasswordChecklist, { isPasswordValid } from '../components/PasswordChecklist';
+import { Button, IconButton, BackButton } from '../components/ui';
+
+/**
+ * Color literal necesario para la prop `color` de los íconos
+ * lucide-react-native dentro del campo (no aceptan className). Coincide con
+ * el mismo valor que ya usa `placeholderTextColor` en components/ui/Input.js.
+ */
+const ICON = { muted: '#9ca3af' };
 
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
@@ -47,27 +55,23 @@ export default function LoginScreen({ navigation }) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           {/* Header */}
           <View className="px-6 pt-4 pb-4 flex-row items-center">
-            <TouchableOpacity
-              onPress={() => navigation.goBack()}
-              className="w-9 h-9 items-center justify-center rounded-xl bg-white shadow-sm border border-gray-100">
-              <ArrowLeft size={18} color="#4b5563" />
-            </TouchableOpacity>
+            <BackButton onPress={() => navigation.goBack()} />
           </View>
 
           {/* Título */}
           <View className="px-7 pb-7">
-            <Text className="text-[28px] font-extrabold text-[#111] leading-tight">
+            <Text className="text-[28px] font-extrabold text-ink leading-tight">
               Bienvenido{'\n'}
-              <Text className="text-[#E8432D]">de vuelta</Text>
+              <Text className="text-brand">de vuelta</Text>
             </Text>
             <Text className="text-[14px] text-gray-500 mt-1.5">Ingresa con tu cuenta para continuar</Text>
           </View>
 
           <View className="px-7 flex-1">
             {/* Email */}
-            <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focusedField === 'email' ? 'border-[#E8432D]' : 'border-gray-100'
+            <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focusedField === 'email' ? 'border-brand' : 'border-gray-100'
               }`}>
-              <Mail size={17} color="#9ca3af" />
+              <Mail size={17} color={ICON.muted} />
               <TextInput
                 placeholder="Correo electrónico"
                 value={email}
@@ -76,15 +80,15 @@ export default function LoginScreen({ navigation }) {
                 onBlur={() => setFocusedField(null)}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                className="flex-1 text-[15px] font-medium text-[#111]"
-                placeholderTextColor="#9ca3af"
+                className="flex-1 text-[15px] font-medium text-ink"
+                placeholderTextColor={ICON.muted}
               />
             </View>
 
             {/* Password */}
-            <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-2 ${focusedField === 'password' ? 'border-[#E8432D]' : 'border-gray-100'
+            <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-2 ${focusedField === 'password' ? 'border-brand' : 'border-gray-100'
               }`}>
-              <Lock size={17} color="#9ca3af" />
+              <Lock size={17} color={ICON.muted} />
               <TextInput
                 placeholder="Contraseña"
                 value={password}
@@ -92,12 +96,17 @@ export default function LoginScreen({ navigation }) {
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
                 secureTextEntry={!showPw}
-                className="flex-1 text-[15px] font-medium text-[#111]"
-                placeholderTextColor="#9ca3af"
+                className="flex-1 text-[15px] font-medium text-ink"
+                placeholderTextColor={ICON.muted}
               />
-              <TouchableOpacity onPress={() => setShowPw(!showPw)}>
-                {showPw ? <EyeOff size={17} color="#9ca3af" /> : <Eye size={17} color="#9ca3af" />}
-              </TouchableOpacity>
+              <IconButton
+                icon={showPw ? EyeOff : Eye}
+                size="md"
+                variant="ghost"
+                iconColor={ICON.muted}
+                accessibilityLabel={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                onPress={() => setShowPw(!showPw)}
+              />
             </View>
 
             {/* Requisitos de contraseña en vivo — ayuda a detectar errores de escritura */}
@@ -111,20 +120,18 @@ export default function LoginScreen({ navigation }) {
             )}
 
             <TouchableOpacity className="mb-8" onPress={() => navigation.navigate('ForgotPassword')}>
-              <Text className="text-right text-[13px] font-semibold text-[#E8432D]">¿Olvidaste tu contraseña?</Text>
+              <Text className="text-right text-[13px] font-semibold text-brand">¿Olvidaste tu contraseña?</Text>
             </TouchableOpacity>
 
             {/* Submit */}
-            <TouchableOpacity
+            <Button
+              fullWidth
+              loading={isLoading}
+              className="shadow-md shadow-brand/30"
               onPress={handleSubmit}
-              disabled={isLoading}
-              className="w-full py-4 bg-[#E8432D] rounded-full flex-row justify-center items-center shadow-md shadow-[#E8432D]/30">
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-white font-bold text-[16px]">Ingresar</Text>
-              )}
-            </TouchableOpacity>
+            >
+              Ingresar
+            </Button>
 
             {/* Divisor */}
             <View className="flex-row items-center gap-3 my-5">
@@ -142,7 +149,7 @@ export default function LoginScreen({ navigation }) {
             <View className="flex-row justify-center mt-6">
               <Text className="text-[14px] text-gray-500">¿No tienes cuenta? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-                <Text className="text-[#E8432D] font-bold text-[14px]">Regístrate gratis</Text>
+                <Text className="text-brand font-bold text-[14px]">Regístrate gratis</Text>
               </TouchableOpacity>
             </View>
           </View>

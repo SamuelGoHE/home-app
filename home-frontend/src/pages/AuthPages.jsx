@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Eye, EyeOff, ArrowLeft, Mail, Lock, User, Phone, CheckCircle2, XCircle, Briefcase, Home, ChevronDown, MapPin } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft, Mail, Lock, User, Phone, CheckCircle2, XCircle, Briefcase, Home, ChevronDown, MapPin, X } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
 import toast from 'react-hot-toast'
 import { useAuthStore } from '../context/authStore'
 import { authService } from '../services'
+import { Button, IconButton } from '../components/ui'
 
 /* ─── Icono Google inline ─────────────────────────────────────────── */
 const GoogleIcon = () => (
@@ -21,7 +22,7 @@ function InputField({ icon: Icon, type = 'text', placeholder, value, onChange, a
   return (
     <div>
       <div className={`flex items-center gap-3 border-2 rounded-2xl px-4 py-3.5 bg-white transition-all duration-200
-        ${error ? 'border-red-400 bg-red-50' : 'border-gray-100 focus-within:border-[#E8432D] focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)]'}`}>
+        ${error ? 'border-red-400 bg-red-50' : 'border-gray-100 focus-within:border-brand focus-within:shadow-[0_0_0_3px_rgba(232,67,45,0.1)]'}`}>
         <Icon size={17} className={`flex-shrink-0 ${error ? 'text-red-400' : 'text-gray-400'}`} />
         <input
           type={type}
@@ -30,7 +31,7 @@ function InputField({ icon: Icon, type = 'text', placeholder, value, onChange, a
           onChange={onChange}
           autoComplete={autoComplete}
           required={required}
-          className="flex-1 text-[15px] font-medium text-[#111] placeholder-gray-400 outline-none bg-transparent"
+          className="flex-1 text-[15px] font-medium text-ink placeholder-gray-400 outline-none bg-transparent"
         />
         {rightEl}
       </div>
@@ -50,7 +51,12 @@ function PasswordStrength({ password }) {
 
   const passed = Object.values(checks).filter(Boolean).length
   const strength = passed <= 1 ? 'Muy débil' : passed === 2 ? 'Débil' : passed === 3 ? 'Buena' : 'Fuerte'
+  // Escala local del medidor de fortaleza (débil→fuerte) — deliberadamente
+  // fuera de la paleta de 6 tonos semánticos: ninguno de estos 4 pasos
+  // coincide exactamente con brand/success/warning/error, y forzarlos
+  // perdería la gradación de 4 pasos que transmite el medidor.
   const colors = ['', '#ef4444', '#f97316', '#eab308', '#22c55e']
+  const TRACK_COLOR = '#e5e7eb' // = tokens.colors.border
 
   if (!password) return null
 
@@ -59,7 +65,7 @@ function PasswordStrength({ password }) {
       <div className="flex gap-1 mb-1.5">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="flex-1 h-1 rounded-full transition-all duration-300"
-            style={{ background: i <= passed ? colors[passed] : '#e5e7eb' }} />
+            style={{ background: i <= passed ? colors[passed] : TRACK_COLOR }} />
         ))}
       </div>
       <div className="flex items-center justify-between">
@@ -112,43 +118,41 @@ function ForgotPasswordModal({ onClose }) {
             <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle2 size={32} className="text-green-500" />
             </div>
-            <h3 className="text-lg font-bold text-[#111] mb-2">¡Correo enviado!</h3>
+            <h3 className="text-lg font-bold text-ink mb-2">¡Correo enviado!</h3>
             <p className="text-sm text-gray-500 mb-6">
-              Si <span className="font-semibold text-[#111]">{email}</span> está registrado, recibirás instrucciones para restablecer tu contraseña.
+              Si <span className="font-semibold text-ink">{email}</span> está registrado, recibirás instrucciones para restablecer tu contraseña.
             </p>
             {resetToken && (
               <div className="mb-4 rounded-2xl bg-gray-50 p-4 text-sm text-gray-600 border border-gray-200">
                 <p className="font-medium text-gray-800 mb-2">En desarrollo puedes usar este enlace directo:</p>
-                <a href={`/reset-password?token=${resetToken}`} className="break-all text-[#E8432D] underline">
+                <a href={`/reset-password?token=${resetToken}`} className="break-all text-brand underline">
                   {`/reset-password?token=${resetToken}`}
                 </a>
               </div>
             )}
-            <button onClick={onClose}
-              className="w-full py-3.5 bg-[#E8432D] text-white rounded-full font-bold text-[15px]">
+            <Button variant="primary" fullWidth onClick={onClose}>
               Entendido
-            </button>
+            </Button>
           </div>
         ) : (
           <>
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-bold text-[#111]">Recuperar contraseña</h3>
-              <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 text-lg font-bold">×</button>
+              <h3 className="text-lg font-bold text-ink">Recuperar contraseña</h3>
+              <IconButton icon={X} size="md" aria-label="Cerrar" onClick={onClose} />
             </div>
             <p className="text-sm text-gray-500 mb-5">Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.</p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <div className={`flex items-center gap-3 border-2 rounded-2xl px-4 py-3.5 bg-white transition-all duration-200
-                ${error ? 'border-red-400 bg-red-50' : 'border-gray-100 focus-within:border-[#E8432D]'}`}>
+                ${error ? 'border-red-400 bg-red-50' : 'border-gray-100 focus-within:border-brand'}`}>
                 <Mail size={17} className={`text-gray-400 flex-shrink-0 ${error ? 'text-red-400' : ''}`} />
                 <input type="email" placeholder="Tu correo electrónico" value={email}
                   onChange={e => setEmail(e.target.value)} required
-                  className="flex-1 text-[15px] font-medium text-[#111] placeholder-gray-400 outline-none bg-transparent" />
+                  className="flex-1 text-[15px] font-medium text-ink placeholder-gray-400 outline-none bg-transparent" />
               </div>
               {error && <p className="text-xs text-red-500 ml-1 font-medium">{error}</p>}
-              <button type="submit" disabled={loading}
-                className="w-full py-3.5 bg-[#E8432D] text-white rounded-full font-bold text-[15px] disabled:opacity-50 mt-1">
+              <Button variant="primary" fullWidth type="submit" loading={loading} className="mt-1">
                 {loading ? 'Enviando...' : 'Enviar instrucciones'}
-              </button>
+              </Button>
             </form>
           </>
         )}
@@ -202,23 +206,23 @@ function ResetPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#fff6f4] to-white flex items-center justify-center px-6 py-10">
+      <div className="min-h-screen bg-gradient-to-b from-brand-soft to-white flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl text-center">
-          <h2 className="text-2xl font-bold text-[#111] mb-4">Contraseña actualizada</h2>
+          <h2 className="text-2xl font-bold text-ink mb-4">Contraseña actualizada</h2>
           <p className="text-gray-500 mb-8">Tu contraseña se actualizó correctamente. Ahora puedes iniciar sesión con tu nueva contraseña.</p>
-          <button onClick={() => navigate('/login')} className="w-full py-3.5 bg-[#E8432D] text-white rounded-full font-bold text-[15px]">
+          <Button variant="primary" fullWidth onClick={() => navigate('/login')}>
             Ir a iniciar sesión
-          </button>
+          </Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fff6f4] to-white flex items-center justify-center px-6 py-10">
+    <div className="min-h-screen bg-gradient-to-b from-brand-soft to-white flex items-center justify-center px-6 py-10">
       <div className="w-full max-w-md bg-white rounded-3xl p-8 shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-[#111]">Restablecer contraseña</h2>
+          <h2 className="text-2xl font-bold text-ink">Restablecer contraseña</h2>
           <button onClick={() => navigate('/login')} className="text-gray-500 hover:text-gray-700">Cancelar</button>
         </div>
         <p className="text-sm text-gray-500 mb-6">Ingresa tu nueva contraseña para recuperar el acceso a tu cuenta.</p>
@@ -228,10 +232,9 @@ function ResetPasswordPage() {
           <InputField icon={Lock} type="password" placeholder="Repite la nueva contraseña" value={confirmPassword}
             onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" required />
           {error && <p className="text-sm text-red-500">{error}</p>}
-          <button type="submit" disabled={loading}
-            className="w-full py-3.5 bg-[#E8432D] text-white rounded-full font-bold text-[15px] disabled:opacity-50">
+          <Button variant="primary" fullWidth type="submit" loading={loading}>
             {loading ? 'Guardando...' : 'Restablecer contraseña'}
-          </button>
+          </Button>
         </form>
       </div>
     </div>
@@ -299,35 +302,37 @@ export function LoginPage() {
   const busy = isLoading || googleLoading
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fff6f4] to-white flex flex-col page-enter">
+    <div className="min-h-screen bg-gradient-to-b from-brand-soft to-white flex flex-col page-enter">
       {/* Header */}
       <div className="px-6 pt-14 pb-4 flex items-center gap-3">
-        <button id="btn-login-back" onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm border border-gray-100">
-          <ArrowLeft size={18} className="text-gray-600" />
-        </button>
+        <IconButton id="btn-login-back" icon={ArrowLeft} variant="solid" aria-label="Volver" onClick={() => navigate(-1)} />
       </div>
 
       {/* Título */}
       <div className="px-7 pb-7">
-        <h1 className="text-[28px] font-extrabold text-[#111] leading-tight">
-          Bienvenido<br /><span className="text-[#E8432D]">de vuelta</span>
+        <h1 className="text-[28px] font-extrabold text-ink leading-tight">
+          Bienvenido<br /><span className="text-brand">de vuelta</span>
         </h1>
         <p className="text-[14px] text-gray-500 mt-1.5">Ingresa con tu cuenta para continuar</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex-1 px-7 flex flex-col gap-4">
         {/* Acceso rápido con Google */}
-        <button id="btn-login-google" type="button"
-          onClick={handleGoogle}
+        <Button
+          id="btn-login-google"
+          type="button"
+          variant="secondary"
+          fullWidth
+          loading={googleLoading}
           disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl border-2 border-gray-100 bg-white shadow-sm
-                     text-[14px] font-semibold text-[#111] hover:border-gray-300 active:scale-[.98] disabled:opacity-50 transition-all">
-          {googleLoading
-            ? <span className="w-4 h-4 border-2 border-gray-300 border-t-[#E8432D] rounded-full animate-spin" />
-            : <GoogleIcon />}
-          Continuar con Google
-        </button>
+          aria-label="Continuar con Google"
+          onClick={handleGoogle}
+        >
+          <span className="flex items-center justify-center gap-2.5">
+            <GoogleIcon />
+            Continuar con Google
+          </span>
+        </Button>
 
         {/* Divider */}
         <div className="flex items-center gap-3">
@@ -357,35 +362,31 @@ export function LoginPage() {
           autoComplete="current-password"
           required
           rightEl={
-            <button type="button" onClick={() => setShowPw(v => !v)} className="text-gray-400 hover:text-gray-600 transition-colors">
-              {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-            </button>
+            <IconButton
+              icon={showPw ? EyeOff : Eye}
+              variant="ghost"
+              aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+              onClick={() => setShowPw(v => !v)}
+            />
           }
         />
 
         {/* Olvidé contraseña */}
         <button id="btn-forgot-password" type="button"
           onClick={() => setShowForgot(true)}
-          className="text-right text-[13px] font-semibold text-[#E8432D] hover:underline -mt-1">
+          className="text-right text-[13px] font-semibold text-brand hover:underline -mt-1">
           ¿Olvidaste tu contraseña?
         </button>
 
         {/* Submit */}
-        <button id="btn-login-submit" type="submit" disabled={busy}
-          className="w-full py-4 bg-[#E8432D] text-white rounded-full font-bold text-[16px] disabled:opacity-50
-                     hover:bg-[#c93820] active:scale-[.98] transition-all shadow-[0_4px_16px_rgba(232,67,45,0.35)]">
-          {isLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              Ingresando...
-            </span>
-          ) : 'Ingresar'}
-        </button>
+        <Button id="btn-login-submit" type="submit" fullWidth size="md" disabled={busy} loading={isLoading}>
+          {isLoading ? 'Ingresando...' : 'Ingresar'}
+        </Button>
 
         {/* Registro */}
         <p className="text-center text-[14px] text-gray-500 pb-8">
           ¿No tienes cuenta?{' '}
-          <Link to="/register" className="text-[#E8432D] font-bold hover:underline">Regístrate gratis</Link>
+          <Link to="/register" className="text-brand font-bold hover:underline">Regístrate gratis</Link>
         </p>
       </form>
 
@@ -491,35 +492,37 @@ export function RegisterPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#fff6f4] to-white flex flex-col page-enter">
+    <div className="min-h-screen bg-gradient-to-b from-brand-soft to-white flex flex-col page-enter">
       {/* Header */}
       <div className="px-6 pt-14 pb-4 flex items-center gap-3">
-        <button id="btn-register-back" onClick={() => navigate(-1)}
-          className="w-9 h-9 flex items-center justify-center rounded-xl bg-white shadow-sm border border-gray-100">
-          <ArrowLeft size={18} className="text-gray-600" />
-        </button>
+        <IconButton id="btn-register-back" icon={ArrowLeft} variant="solid" aria-label="Volver" onClick={() => navigate(-1)} />
       </div>
 
       {/* Título */}
       <div className="px-7 pb-6">
-        <h1 className="text-[28px] font-extrabold text-[#111] leading-tight">
-          Crea tu cuenta<br /><span className="text-[#E8432D]">es gratis</span>
+        <h1 className="text-[28px] font-extrabold text-ink leading-tight">
+          Crea tu cuenta<br /><span className="text-brand">es gratis</span>
         </h1>
         <p className="text-[14px] text-gray-500 mt-1.5">Solo te tomará un minuto</p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex-1 px-7 flex flex-col gap-4 pb-10">
         {/* Google rápido */}
-        <button id="btn-register-google" type="button"
-          onClick={handleGoogle}
+        <Button
+          id="btn-register-google"
+          type="button"
+          variant="secondary"
+          fullWidth
+          loading={googleLoading}
           disabled={busy}
-          className="w-full flex items-center justify-center gap-2.5 py-3.5 rounded-2xl border-2 border-gray-100 bg-white shadow-sm
-                     text-[14px] font-semibold text-[#111] hover:border-gray-300 active:scale-[.98] disabled:opacity-50 transition-all">
-          {googleLoading
-            ? <span className="w-4 h-4 border-2 border-gray-300 border-t-[#E8432D] rounded-full animate-spin" />
-            : <GoogleIcon />}
-          Registrarme con Google
-        </button>
+          aria-label="Registrarme con Google"
+          onClick={handleGoogle}
+        >
+          <span className="flex items-center justify-center gap-2.5">
+            <GoogleIcon />
+            Registrarme con Google
+          </span>
+        </Button>
 
         <div className="flex items-center gap-3">
           <div className="flex-1 h-px bg-gray-200" />
@@ -547,9 +550,12 @@ export function RegisterPage() {
             required
             error={errors.password}
             rightEl={
-              <button type="button" onClick={() => setShowPw(v => !v)} className="text-gray-400 hover:text-gray-600 transition-colors">
-                {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
-              </button>
+              <IconButton
+                icon={showPw ? EyeOff : Eye}
+                variant="ghost"
+                aria-label={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                onClick={() => setShowPw(v => !v)}
+              />
             }
           />
           <PasswordStrength password={form.password} />
@@ -571,11 +577,11 @@ export function RegisterPage() {
                 onClick={() => setForm(f => ({ ...f, role: r.key }))}
                 className={`flex-1 py-3.5 px-3 rounded-2xl border-2 text-left transition-all duration-200 active:scale-[.98]
                   ${form.role === r.key
-                    ? 'border-[#E8432D] bg-[#fff4f2] shadow-[0_0_0_3px_rgba(232,67,45,0.1)]'
+                    ? 'border-brand bg-brand-soft shadow-[0_0_0_3px_rgba(232,67,45,0.1)]'
                     : 'border-gray-100 bg-white hover:border-gray-300'
                   }`}
               >
-                <span className={`flex items-center gap-1.5 text-[13px] font-bold mb-0.5 ${form.role === r.key ? 'text-[#E8432D]' : 'text-gray-600'}`}>
+                <span className={`flex items-center gap-1.5 text-[13px] font-bold mb-0.5 ${form.role === r.key ? 'text-brand' : 'text-gray-600'}`}>
                   {r.icon} {r.title}
                 </span>
                 <span className="text-[11px] text-gray-400 leading-tight">{r.desc}</span>
@@ -593,7 +599,7 @@ export function RegisterPage() {
             <select
               value={form.city}
               onChange={set('city')}
-              className={`w-full bg-white border ${errors.city ? 'border-red-400' : 'border-gray-100'} rounded-2xl pl-12 pr-10 py-4 text-[14px] font-semibold text-[#111] appearance-none outline-none focus:border-[#E8432D] shadow-sm transition-all`}
+              className={`w-full bg-white border ${errors.city ? 'border-red-400' : 'border-gray-100'} rounded-2xl pl-12 pr-10 py-4 text-[14px] font-semibold text-ink appearance-none outline-none focus:border-brand shadow-sm transition-all`}
             >
               <option value="" disabled>Selecciona tu ciudad</option>
               <option value="Medellín">Medellín</option>
@@ -609,20 +615,13 @@ export function RegisterPage() {
         )}
 
         {/* Submit */}
-        <button id="btn-register-submit" type="submit" disabled={busy}
-          className="w-full py-4 bg-[#E8432D] text-white rounded-full font-bold text-[16px] disabled:opacity-50 mt-1
-                     hover:bg-[#c93820] active:scale-[.98] transition-all shadow-[0_4px_16px_rgba(232,67,45,0.35)]">
-          {isLoading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              Creando cuenta...
-            </span>
-          ) : 'Crear cuenta gratis'}
-        </button>
+        <Button id="btn-register-submit" type="submit" fullWidth disabled={busy} loading={isLoading} className="mt-1">
+          {isLoading ? 'Creando cuenta...' : 'Crear cuenta gratis'}
+        </Button>
 
         <p className="text-center text-[14px] text-gray-500">
           ¿Ya tienes cuenta?{' '}
-          <Link to="/login" className="text-[#E8432D] font-bold hover:underline">Inicia sesión</Link>
+          <Link to="/login" className="text-brand font-bold hover:underline">Inicia sesión</Link>
         </p>
 
         <p className="text-[11px] text-gray-400 text-center leading-relaxed -mt-1">

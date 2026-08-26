@@ -1,13 +1,27 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
+  Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  Mail, Lock, Eye, EyeOff, ArrowLeft, KeyRound, CheckCircle, ShieldCheck,
+  Mail, Lock, Eye, EyeOff, KeyRound, CheckCircle, ShieldCheck,
 } from 'lucide-react-native';
 import { authService } from '../services';
+import { Button, IconButton, BackButton } from '../components/ui';
+
+/**
+ * Colores literales necesarios para props `color`/`style` que no aceptan
+ * clases de Tailwind (íconos lucide-react-native, fondos dinámicos del
+ * checklist de requisitos).
+ */
+const ICON = {
+  muted: '#9ca3af',   // = placeholderTextColor de components/ui/Input.js
+  brand: '#E8432D',   // = tokens.colors.brand.DEFAULT
+  success: '#16a34a', // = tokens.colors.success
+  border: '#e5e7eb',  // = tokens.colors.border
+  surface: '#ffffff', // = tokens.colors.surface.DEFAULT
+};
 
 /* ─── Reglas de contraseña ───────────────────────────────────────── */
 const PASSWORD_RULES = [
@@ -95,24 +109,19 @@ export default function ForgotPasswordScreen({ navigation }) {
         <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
           {/* Header */}
           <View className="px-6 pt-4 pb-4 flex-row items-center">
-            <TouchableOpacity
-              onPress={() => (step === 2 ? setStep(1) : navigation.goBack())}
-              className="w-9 h-9 items-center justify-center rounded-xl bg-white shadow-sm border border-gray-100"
-            >
-              <ArrowLeft size={18} color="#4b5563" />
-            </TouchableOpacity>
+            <BackButton onPress={() => (step === 2 ? setStep(1) : navigation.goBack())} />
           </View>
 
           {/* Ícono + Título */}
           <View className="px-7 pb-7">
             <View className="w-14 h-14 rounded-2xl bg-red-50 items-center justify-center mb-4">
               {step === 1
-                ? <KeyRound size={26} color="#E8432D" />
-                : <ShieldCheck size={26} color="#E8432D" />}
+                ? <KeyRound size={26} color={ICON.brand} />
+                : <ShieldCheck size={26} color={ICON.brand} />}
             </View>
-            <Text className="text-[28px] font-extrabold text-[#111] leading-tight">
+            <Text className="text-[28px] font-extrabold text-ink leading-tight">
               {step === 1 ? 'Recuperar' : 'Nueva'}{'\n'}
-              <Text className="text-[#E8432D]">{step === 1 ? 'contraseña' : 'contraseña'}</Text>
+              <Text className="text-brand">{step === 1 ? 'contraseña' : 'contraseña'}</Text>
             </Text>
             <Text className="text-[14px] text-gray-500 mt-1.5">
               {step === 1
@@ -125,8 +134,8 @@ export default function ForgotPasswordScreen({ navigation }) {
             {step === 1 ? (
               <>
                 {/* Email */}
-                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-6 ${focused === 'email' ? 'border-[#E8432D]' : 'border-gray-100'}`}>
-                  <Mail size={17} color="#9ca3af" />
+                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-6 ${focused === 'email' ? 'border-brand' : 'border-gray-100'}`}>
+                  <Mail size={17} color={ICON.muted} />
                   <TextInput
                     placeholder="Correo electrónico"
                     value={email}
@@ -135,27 +144,26 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onBlur={() => setFocused(null)}
                     keyboardType="email-address"
                     autoCapitalize="none"
-                    className="flex-1 text-[15px] font-medium text-[#111]"
-                    placeholderTextColor="#9ca3af"
+                    className="flex-1 text-[15px] font-medium text-ink"
+                    placeholderTextColor={ICON.muted}
                   />
                 </View>
 
-                <TouchableOpacity
+                <Button
+                  fullWidth
+                  loading={loading}
+                  className="shadow-md shadow-brand/30"
                   onPress={handleRequest}
-                  disabled={loading}
-                  className="w-full py-4 bg-[#E8432D] rounded-full flex-row justify-center items-center shadow-md shadow-[#E8432D]/30"
                 >
-                  {loading
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text className="text-white font-bold text-[16px]">Continuar</Text>}
-                </TouchableOpacity>
+                  Continuar
+                </Button>
               </>
             ) : (
               <>
                 {/* Banner según modo */}
                 {autoToken ? (
                   <View className="flex-row items-center gap-2 bg-green-50 border border-green-100 rounded-2xl px-4 py-3 mb-5">
-                    <CheckCircle size={18} color="#16a34a" />
+                    <CheckCircle size={18} color={ICON.success} />
                     <Text className="flex-1 text-[12px] font-medium text-green-700">
                       Verificamos tu cuenta. Crea tu nueva contraseña.
                     </Text>
@@ -170,8 +178,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
                 {/* Campo de código (solo si no vino automático) */}
                 {!autoToken && (
-                  <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focused === 'token' ? 'border-[#E8432D]' : 'border-gray-100'}`}>
-                    <KeyRound size={17} color="#9ca3af" />
+                  <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focused === 'token' ? 'border-brand' : 'border-gray-100'}`}>
+                    <KeyRound size={17} color={ICON.muted} />
                     <TextInput
                       placeholder="Código de recuperación"
                       value={token}
@@ -179,15 +187,15 @@ export default function ForgotPasswordScreen({ navigation }) {
                       onFocus={() => setFocused('token')}
                       onBlur={() => setFocused(null)}
                       autoCapitalize="none"
-                      className="flex-1 text-[15px] font-medium text-[#111]"
-                      placeholderTextColor="#9ca3af"
+                      className="flex-1 text-[15px] font-medium text-ink"
+                      placeholderTextColor={ICON.muted}
                     />
                   </View>
                 )}
 
                 {/* Nueva contraseña */}
-                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-3 ${focused === 'pw' ? 'border-[#E8432D]' : 'border-gray-100'}`}>
-                  <Lock size={17} color="#9ca3af" />
+                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-3 ${focused === 'pw' ? 'border-brand' : 'border-gray-100'}`}>
+                  <Lock size={17} color={ICON.muted} />
                   <TextInput
                     placeholder="Nueva contraseña"
                     value={password}
@@ -195,17 +203,22 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onFocus={() => setFocused('pw')}
                     onBlur={() => setFocused(null)}
                     secureTextEntry={!showPw}
-                    className="flex-1 text-[15px] font-medium text-[#111]"
-                    placeholderTextColor="#9ca3af"
+                    className="flex-1 text-[15px] font-medium text-ink"
+                    placeholderTextColor={ICON.muted}
                   />
-                  <TouchableOpacity onPress={() => setShowPw(!showPw)}>
-                    {showPw ? <EyeOff size={17} color="#9ca3af" /> : <Eye size={17} color="#9ca3af" />}
-                  </TouchableOpacity>
+                  <IconButton
+                    icon={showPw ? EyeOff : Eye}
+                    size="md"
+                    variant="ghost"
+                    iconColor={ICON.muted}
+                    accessibilityLabel={showPw ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    onPress={() => setShowPw(!showPw)}
+                  />
                 </View>
 
                 {/* Confirmar contraseña */}
-                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focused === 'confirm' ? 'border-[#E8432D]' : 'border-gray-100'}`}>
-                  <Lock size={17} color="#9ca3af" />
+                <View className={`flex-row items-center gap-3 border-2 rounded-2xl px-4 py-3.5 mb-4 ${focused === 'confirm' ? 'border-brand' : 'border-gray-100'}`}>
+                  <Lock size={17} color={ICON.muted} />
                   <TextInput
                     placeholder="Confirmar contraseña"
                     value={confirm}
@@ -213,8 +226,8 @@ export default function ForgotPasswordScreen({ navigation }) {
                     onFocus={() => setFocused('confirm')}
                     onBlur={() => setFocused(null)}
                     secureTextEntry={!showPw}
-                    className="flex-1 text-[15px] font-medium text-[#111]"
-                    placeholderTextColor="#9ca3af"
+                    className="flex-1 text-[15px] font-medium text-ink"
+                    placeholderTextColor={ICON.muted}
                   />
                 </View>
 
@@ -226,9 +239,9 @@ export default function ForgotPasswordScreen({ navigation }) {
                       <View key={r.key} className="flex-row items-center gap-2">
                         <View
                           className="w-4 h-4 rounded-full items-center justify-center"
-                          style={{ backgroundColor: ok ? '#16a34a' : '#e5e7eb' }}
+                          style={{ backgroundColor: ok ? ICON.success : ICON.border }}
                         >
-                          {ok && <CheckCircle size={11} color="#fff" />}
+                          {ok && <CheckCircle size={11} color={ICON.surface} />}
                         </View>
                         <Text className={`text-[12px] font-medium ${ok ? 'text-green-700' : 'text-gray-400'}`}>
                           {r.label}
@@ -240,9 +253,9 @@ export default function ForgotPasswordScreen({ navigation }) {
                     <View className="flex-row items-center gap-2">
                       <View
                         className="w-4 h-4 rounded-full items-center justify-center"
-                        style={{ backgroundColor: matches ? '#16a34a' : '#e5e7eb' }}
+                        style={{ backgroundColor: matches ? ICON.success : ICON.border }}
                       >
-                        {matches && <CheckCircle size={11} color="#fff" />}
+                        {matches && <CheckCircle size={11} color={ICON.surface} />}
                       </View>
                       <Text className={`text-[12px] font-medium ${matches ? 'text-green-700' : 'text-gray-400'}`}>
                         Las contraseñas coinciden
@@ -251,18 +264,14 @@ export default function ForgotPasswordScreen({ navigation }) {
                   )}
                 </View>
 
-                <TouchableOpacity
+                <Button
+                  fullWidth
+                  loading={loading}
+                  disabled={!passwordValid || !matches}
                   onPress={handleReset}
-                  disabled={loading || !passwordValid || !matches}
-                  className="w-full py-4 rounded-full flex-row justify-center items-center"
-                  style={{ backgroundColor: (!passwordValid || !matches) ? '#e5e7eb' : '#E8432D' }}
                 >
-                  {loading
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text className={`font-bold text-[16px] ${(!passwordValid || !matches) ? 'text-gray-400' : 'text-white'}`}>
-                        Restablecer contraseña
-                      </Text>}
-                </TouchableOpacity>
+                  Restablecer contraseña
+                </Button>
               </>
             )}
 
@@ -270,7 +279,7 @@ export default function ForgotPasswordScreen({ navigation }) {
             <View className="flex-row justify-center mt-8">
               <Text className="text-[14px] text-gray-500">¿Ya la recordaste? </Text>
               <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-                <Text className="text-[#E8432D] font-bold text-[14px]">Inicia sesión</Text>
+                <Text className="text-brand font-bold text-[14px]">Inicia sesión</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -5,10 +5,21 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-  ArrowLeft, MapPin, Star,
+  MapPin, Star,
   SlidersHorizontal, AlertCircle, X,
 } from 'lucide-react-native';
 import { useWorkers } from '../hooks/useApi';
+import { Button, IconButton, BackButton, Card, Badge, ErrorState } from '../components/ui';
+
+/**
+ * Colores literales necesarios para props `color` de lucide-react-native
+ * (los íconos SVG no aceptan clases de Tailwind). Cada uno coincide
+ * exactamente con el token homónimo de design-system/tokens.js.
+ */
+const ICON = {
+  muted: '#6b7280',
+  brand: '#E8432D',
+};
 
 const CITIES = [
   { value: '', label: 'Todas las ciudades' },
@@ -28,10 +39,11 @@ function WorkerCard({ worker, onPress }) {
   const profile = worker.workerProfile || {};
 
   return (
-    <TouchableOpacity
+    <Card
+      padding="sm"
       onPress={onPress}
-      className="bg-white rounded-3xl p-4 flex-row gap-4 shadow-sm border border-gray-100 mb-4"
-      activeOpacity={0.85}
+      accessibilityLabel={`Ver perfil de ${worker.name}`}
+      className="flex-row gap-4 mb-4"
     >
       {/* Avatar */}
       <View className="w-20 h-20 rounded-2xl overflow-hidden bg-gray-100 flex-shrink-0">
@@ -47,20 +59,16 @@ function WorkerCard({ worker, onPress }) {
         <View>
           {/* Nombre + badge */}
           <View className="flex-row items-center gap-2 flex-wrap">
-            <Text className="font-extrabold text-[17px] text-[#111]">
+            <Text className="font-extrabold text-[17px] text-ink">
               {worker.name?.split(' ')[0]}
             </Text>
-            {profile.is_verified && (
-              <View className="bg-emerald-50 px-2 py-0.5 rounded-full">
-                <Text className="text-[10px] font-semibold text-emerald-700">Verificado</Text>
-              </View>
-            )}
+            {profile.is_verified && <Badge tone="success">Verificado</Badge>}
           </View>
 
           {/* Ciudad */}
           <View className="flex-row items-center gap-1 mt-0.5">
-            <MapPin size={12} color="#9ca3af" />
-            <Text className="text-[12px] text-gray-400" numberOfLines={1}>
+            <MapPin size={12} color={ICON.muted} />
+            <Text className="text-[12px] text-muted" numberOfLines={1}>
               {profile.cities_covered?.[0] || 'Varias ciudades'}
             </Text>
           </View>
@@ -69,18 +77,18 @@ function WorkerCard({ worker, onPress }) {
         {/* Rating - Solo mostrar si hay datos */}
         {Number(worker.rating_count) > 0 && (
           <View className="flex-row items-center gap-1 mt-2">
-            <Star size={13} color="#E8432D" fill="#E8432D" />
-            <Text className="text-[13px] font-bold text-[#111]">
+            <Star size={13} color={ICON.brand} fill={ICON.brand} />
+            <Text className="text-[13px] font-bold text-ink">
               {worker.rating_avg ? parseFloat(worker.rating_avg).toFixed(1) : '--'}
             </Text>
-            <Text className="text-[12px] text-gray-400">
+            <Text className="text-[12px] text-muted">
               ({worker.rating_count ?? 0})
             </Text>
           </View>
         )}
       </View>
 
-    </TouchableOpacity>
+    </Card>
   );
 }
 
@@ -102,7 +110,7 @@ export default function ResultsScreen({ route, navigation }) {
   const [filterCity, setFilterCity] = useState(initCity);
   const [showFilter, setShowFilter] = useState(false);
 
-  const { data: workers, loading } = useWorkers(filterCity, serviceCategory);
+  const { data: workers, loading, error, refetch } = useWorkers(filterCity, serviceCategory);
 
   const handleSelectCity = (city) => {
     setFilterCity(city);
@@ -134,16 +142,16 @@ export default function ResultsScreen({ route, navigation }) {
 
   /* ── Empty / error states ── */
   const ListEmpty = () => (
-    <View className="bg-white rounded-3xl p-10 items-center border border-gray-100 shadow-sm mt-2">
-      <View className="w-16 h-16 bg-red-50 rounded-full items-center justify-center mb-4">
-        <AlertCircle size={24} color="#E8432D" />
+    <Card padding="lg" className="items-center mt-2">
+      <View className="w-16 h-16 bg-brand-soft rounded-full items-center justify-center mb-4">
+        <AlertCircle size={24} color={ICON.brand} />
       </View>
-      <Text className="text-[16px] font-extrabold text-[#111] mb-1">Sin resultados</Text>
+      <Text className="text-[16px] font-extrabold text-ink mb-1">Sin resultados</Text>
       <Text className="text-[13px] text-gray-500 text-center">
         No encontramos trabajadores disponibles en{' '}
         <Text className="font-bold">{filterCity || 'tu área'}</Text> en este momento.
       </Text>
-    </View>
+    </Card>
   );
 
   const ListHeader = () => (
@@ -157,37 +165,37 @@ export default function ResultsScreen({ route, navigation }) {
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
       {/* Header */}
-      <View className="bg-white px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-gray-100">
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          className="w-9 h-9 items-center justify-center rounded-xl bg-gray-100"
-        >
-          <ArrowLeft size={18} color="#4b5563" />
-        </TouchableOpacity>
+      <View className="bg-surface px-5 pt-4 pb-4 flex-row items-center gap-3 border-b border-border">
+        <BackButton onPress={() => navigation.goBack()} />
 
         <View className="flex-1">
-          <Text className="font-bold text-[17px] text-[#111]">Trabajadores disponibles</Text>
+          <Text className="font-bold text-[17px] text-ink">Trabajadores disponibles</Text>
           {serviceName && serviceName !== 'Servicio' && (
-            <Text className="text-[12px] text-gray-400" numberOfLines={1}>{serviceName}</Text>
+            <Text className="text-[12px] text-muted" numberOfLines={1}>{serviceName}</Text>
           )}
         </View>
 
         {/* Filtro */}
-        <TouchableOpacity
-          onPress={() => setShowFilter(true)}
-          className="w-9 h-9 items-center justify-center rounded-xl bg-gray-100 relative"
-        >
-          <SlidersHorizontal size={17} color="#4b5563" />
+        <View className="relative">
+          <IconButton
+            icon={SlidersHorizontal}
+            accessibilityLabel="Filtrar por ciudad"
+            onPress={() => setShowFilter(true)}
+          />
           {filterCity ? (
-            <View className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#E8432D] rounded-full border border-white" />
+            <View className="absolute top-1.5 right-1.5 w-2 h-2 bg-brand rounded-full border border-white pointer-events-none" />
           ) : null}
-        </TouchableOpacity>
+        </View>
       </View>
 
       {/* Lista */}
       {loading ? (
         <View className="flex-1 items-center justify-center">
-          <ActivityIndicator size="large" color="#E8432D" />
+          <ActivityIndicator size="large" color={ICON.brand} />
+        </View>
+      ) : error ? (
+        <View className="flex-1 items-center justify-center px-8">
+          <ErrorState message={error} onRetry={refetch} />
         </View>
       ) : (
         <FlatList
@@ -204,31 +212,24 @@ export default function ResultsScreen({ route, navigation }) {
       {/* Modal filtro por ciudad */}
       <Modal visible={showFilter} transparent animationType="slide">
         <View className="flex-1 justify-end bg-black/40">
-          <TouchableOpacity className="flex-1" onPress={() => setShowFilter(false)} />
-          <View className="bg-white rounded-t-3xl p-6 pb-10">
+          <TouchableOpacity className="flex-1" onPress={() => setShowFilter(false)} accessibilityRole="button" accessibilityLabel="Cerrar" />
+          <View className="bg-surface rounded-t-3xl p-6 pb-10">
             <View className="flex-row items-center justify-between mb-6">
-              <Text className="text-xl font-extrabold text-[#111]">Filtrar por Ciudad</Text>
-              <TouchableOpacity
-                onPress={() => setShowFilter(false)}
-                className="w-8 h-8 items-center justify-center rounded-full bg-gray-100"
-              >
-                <X size={18} color="#6b7280" />
-              </TouchableOpacity>
+              <Text className="text-xl font-extrabold text-ink">Filtrar por Ciudad</Text>
+              <IconButton icon={X} variant="solid" accessibilityLabel="Cerrar" className="!bg-gray-100 !border-0" onPress={() => setShowFilter(false)} />
             </View>
 
             {CITIES.map((opt) => {
               const active = filterCity === opt.value;
               return (
-                <TouchableOpacity
+                <Button
                   key={opt.label}
+                  variant={active ? 'primary' : 'secondary'}
+                  className={`!justify-start !rounded-2xl mb-2 ${active ? '' : '!border-0 !bg-gray-50'}`}
                   onPress={() => handleSelectCity(opt.value)}
-                  className={`py-3.5 px-4 rounded-2xl mb-2 ${active ? 'bg-[#E8432D]' : 'bg-gray-50'}`}
-                  activeOpacity={0.8}
                 >
-                  <Text className={`text-[15px] font-bold ${active ? 'text-white' : 'text-gray-700'}`}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
+                  {opt.label}
+                </Button>
               );
             })}
           </View>

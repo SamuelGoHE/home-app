@@ -1,39 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import {
-  ArrowLeft, Calendar, MapPin, FileText, CheckCircle2,
-  Clock, AlertCircle, Phone, Star, ShieldCheck,
-  MessageCircle, Check, Zap, Search
-} from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, MessageCircle, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useProject } from '../hooks/useApi'
 import { useAuthStore } from '../context/authStore'
 import api from '../services/api'
-import { CardSkeleton, EmptyState, ErrorState } from '../components/common'
+import { EmptyState, ErrorState, StatusBadge } from '../components/common'
+import { Button, IconButton, Card, Skeleton } from '../components/ui'
 import toast from 'react-hot-toast'
 
 function formatDate(d) {
   if (!d) return 'Sin fecha asignada'
   return format(new Date(d), "d MMM yyyy", { locale: es })
-}
-
-const STATUS_UI = {
-  pendiente: { label: 'Pendiente', color: 'text-gray-600', bg: 'bg-gray-100', icon: Clock },
-  en_revision: { label: 'En revisión', color: 'text-amber-600', bg: 'bg-amber-100', icon: AlertCircle },
-  aprobado: { label: 'Aprobado', color: 'text-blue-600', bg: 'bg-blue-100', icon: CheckCircle2 },
-  en_progreso: { label: 'En progreso', color: 'text-orange-600', bg: 'bg-orange-100', icon: Clock },
-  pausado: { label: 'Pausado', color: 'text-gray-500', bg: 'bg-gray-100', icon: AlertCircle },
-  completado: { label: 'Completado', color: 'text-emerald-600', bg: 'bg-emerald-100', icon: CheckCircle2 },
-  cancelado: { label: 'Cancelado', color: 'text-red-600', bg: 'bg-red-100', icon: AlertCircle },
-  completada: { label: 'Completada', color: 'text-emerald-600', bg: 'bg-emerald-100', icon: CheckCircle2 },
-}
-
-const PRIORITY_UI = {
-  baja: { label: 'Baja', color: 'bg-gray-400' },
-  media: { label: 'Media', color: 'bg-blue-500' },
-  alta: { label: 'Alta', color: 'bg-orange-500' },
-  urgente: { label: 'Urgente', color: 'bg-red-500' },
 }
 
 export default function ProjectDetailPage() {
@@ -72,9 +51,6 @@ export default function ProjectDetailPage() {
   const pct = tasks.length ? Math.round((totalWeight / tasks.length) * 100) : 0
   const done = tasks.filter(t => t.status === 'completada').length
 
-  const statusDef = project ? (STATUS_UI[project.status] || STATUS_UI.pendiente) : STATUS_UI.pendiente
-  const StatusIcon = statusDef.icon
-
   const assignedWorker = tasks.find(t => t.assignee)?.assignee
   const isCompleted = project?.status === 'completado'
 
@@ -97,108 +73,152 @@ export default function ProjectDetailPage() {
   const action = workerAction()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex justify-center">
-      <div className="w-full max-w-3xl bg-white min-h-screen">
+    <div className="min-h-screen bg-background flex justify-center">
+      <div className="w-full max-w-3xl bg-surface min-h-screen">
 
         {/* HEADER */}
-        <div className="sticky top-0 bg-white border-b px-6 pt-10 pb-3 flex items-center gap-3">
-          <button onClick={() => navigate(-1)}>
-            <ArrowLeft />
-          </button>
-          <div>
-            <h2>{project?.title || 'Cargando...'}</h2>
-          </div>
+        <div className="sticky top-0 z-10 bg-surface border-b border-border px-5 pt-10 pb-3 flex items-center gap-2">
+          <IconButton icon={ArrowLeft} aria-label="Volver" onClick={() => navigate(-1)} />
+          <h1 className="text-heading text-ink truncate">{project?.title || 'Cargando...'}</h1>
         </div>
 
-        <div className="p-5 space-y-5">
+        <div className="p-5 space-y-4">
 
-          {loading && <CardSkeleton />}
+          {loading && (
+            <div className="space-y-4">
+              <Skeleton className="h-28 w-full" />
+              <Skeleton className="h-11 w-full" />
+              <Skeleton className="h-24 w-full" />
+              <Skeleton className="h-40 w-full" />
+            </div>
+          )}
+
           {error && <ErrorState message={error} onRetry={refetch} />}
-          {!loading && !error && !project && <EmptyState title="No encontrado" />}
+
+          {!loading && !error && !project && (
+            <EmptyState
+              icon="🔍"
+              title="Proyecto no encontrado"
+              subtitle="Puede que haya sido eliminado o que no tengas acceso a él."
+              action="Volver"
+              onAction={() => navigate(-1)}
+            />
+          )}
 
           {!loading && !error && project && (
             <>
               {/* HERO */}
-              <div className="border p-4 rounded-xl">
-                <StatusIcon />
-                <h1>{project.title}</h1>
-                <p>{project.service?.name}</p>
+              <Card padding="lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-caption text-muted mb-1 truncate">{project.service?.name}</p>
+                    <h2 className="text-heading text-ink truncate">{project.title}</h2>
+                  </div>
+                  <StatusBadge status={project.status} />
+                </div>
 
                 {tasks.length > 0 && (
-                  <div>
-                    <p>{pct}%</p>
-                    <div className="bg-gray-200 h-2">
-                      <div style={{ width: `${pct}%` }} className="bg-orange-500 h-2" />
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-semibold text-muted">Progreso</span>
+                      <span className="text-xs font-bold text-ink">{pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                      <div
+                        className="h-2 rounded-full bg-brand transition-all duration-500"
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
 
-              {/* BOTONES */}
+              {/* ACCIÓN PRINCIPAL (solo trabajador) */}
               {action && (
-                <button
-                  disabled={updating}
+                <Button
+                  variant="primary"
+                  fullWidth
+                  loading={updating}
                   onClick={() => handleUpdateStatus(action.status)}
-                  className="w-full py-3 bg-[#E8432D] text-white rounded-2xl font-bold text-sm active:scale-[.98] transition-all"
                 >
                   {updating ? 'Actualizando...' : action.label}
-                </button>
+                </Button>
               )}
 
               {/* DETALLES */}
-              <div className="border p-4 rounded-xl">
-                <p>{project.address}</p>
-                <p>{project.city}</p>
-                <p>{formatDate(project.start_date)}</p>
-              </div>
+              <Card padding="md">
+                <h3 className="text-label uppercase text-muted mb-3">Detalles</h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3">
+                    <MapPin size={16} className="text-muted flex-none mt-0.5" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <p className="text-body text-ink truncate">{project.address}</p>
+                      <p className="text-caption text-muted">{project.city}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar size={16} className="text-muted flex-none" aria-hidden="true" />
+                    <p className="text-body text-ink">{formatDate(project.start_date)}</p>
+                  </div>
+                </div>
+              </Card>
 
               {/* CONTACTO */}
               {(assignedWorker || project.client) && (
-                <div className="border p-4 rounded-xl">
-                  <p>
-                    {user?.role === 'trabajador'
-                      ? project.client?.name
-                      : assignedWorker?.name}
-                  </p>
-
-                  <button onClick={() => navigate(`/chat/${project.id}`)}>
-                    <MessageCircle />
-                  </button>
-                </div>
+                <Card padding="md">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-label uppercase text-muted mb-1">
+                        {user?.role === 'trabajador' ? 'Cliente' : 'Profesional asignado'}
+                      </p>
+                      <p className="text-body font-semibold text-ink truncate">
+                        {user?.role === 'trabajador' ? project.client?.name : assignedWorker?.name}
+                      </p>
+                    </div>
+                    <IconButton
+                      icon={MessageCircle}
+                      variant="solid"
+                      aria-label="Enviar mensaje"
+                      onClick={() => navigate(`/chat/${project.id}`)}
+                    />
+                  </div>
+                </Card>
               )}
 
               {/* TAREAS */}
-              <div className="border p-4 rounded-xl">
-                <h3>Tareas ({done}/{tasks.length})</h3>
+              <Card padding="md">
+                <h3 className="text-label uppercase text-muted mb-3">Tareas ({done}/{tasks.length})</h3>
 
                 {!tasks.length ? (
-                  <p>No hay tareas</p>
+                  <p className="text-caption text-muted">No hay tareas registradas todavía</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div>
                     {tasks.map(task => {
-                      const tStatus = STATUS_UI[task.status] || STATUS_UI.pendiente
-
+                      const isDone = task.status === 'completada'
                       return (
-                        <div key={task.id} className="border p-3 rounded-lg flex gap-3">
-                          <div>
-                            {task.status === 'completada'
-                              ? <Check />
-                              : <div className="w-2 h-2 bg-gray-300 rounded-full" />
-                            }
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 py-2.5 border-b border-border last:border-0"
+                        >
+                          <div
+                            className={[
+                              'w-5 h-5 rounded-full flex items-center justify-center flex-none',
+                              isDone ? 'bg-brand' : 'border-2 border-border',
+                            ].join(' ')}
+                            aria-hidden="true"
+                          >
+                            {isDone && <Check size={12} className="text-white" strokeWidth={3} />}
                           </div>
-
-                          <div>
-                            <p className={task.status === 'completada' ? 'line-through' : ''}>
-                              {task.title}
-                            </p>
-                            <span>{tStatus.label}</span>
-                          </div>
+                          <p className={['flex-1 text-body truncate', isDone ? 'line-through text-muted' : 'text-ink'].join(' ')}>
+                            {task.title}
+                          </p>
+                          <StatusBadge status={task.status} />
                         </div>
                       )
                     })}
                   </div>
                 )}
-              </div>
+              </Card>
             </>
           )}
         </div>

@@ -8,6 +8,8 @@ import {
   Clock, Activity
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { StatusBadge } from '../components/common'
+import { getStatus } from '../design-system/status.js'
 
 const NAV = [
   { id: 'dashboard', label: 'Dashboard',    icon: LayoutDashboard },
@@ -15,12 +17,14 @@ const NAV = [
 ]
 
 /* ─── Sidebar ─────────────────────────────────────────────── */
+/* Estructura fija/no responsive intencionalmente sin tocar en esta fase —
+   solo se tokenizan colores (#111 → ink, #E8432D → brand). */
 function Sidebar({ active, setActive, user, onLogout }) {
   return (
-    <div className="w-56 bg-[#111] min-h-screen flex flex-col flex-shrink-0">
+    <div className="w-56 bg-ink min-h-screen flex flex-col flex-shrink-0">
       <div className="px-5 pt-8 pb-6 border-b border-white/10">
         <div className="flex items-center gap-2 mb-3">
-          <ShieldCheck size={18} className="text-[#E8432D]" />
+          <ShieldCheck size={18} className="text-brand" />
           <span className="text-white font-bold text-[13px]">Panel Supervisor</span>
         </div>
         <p className="text-white/40 text-[10px] font-semibold uppercase tracking-widest">HOME Admin</p>
@@ -29,7 +33,7 @@ function Sidebar({ active, setActive, user, onLogout }) {
         {NAV.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActive(id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all
-              ${active === id ? 'bg-[#E8432D] text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
+              ${active === id ? 'bg-brand text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
             <Icon size={16} strokeWidth={2} />
             {label}
           </button>
@@ -37,7 +41,7 @@ function Sidebar({ active, setActive, user, onLogout }) {
       </nav>
       <div className="px-4 pb-6 border-t border-white/10 pt-4">
         <div className="flex items-center gap-2 mb-3">
-          <div className="w-7 h-7 rounded-full bg-[#E8432D] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
             {user?.name?.[0]?.toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -61,30 +65,30 @@ function StatCard({ label, value, icon: Icon, color, sub }) {
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color} mb-3`}>
         <Icon size={18} strokeWidth={2} className="text-white" />
       </div>
-      <p className="text-3xl font-extrabold text-[#111]">{value ?? '—'}</p>
+      <p className="text-3xl font-extrabold text-ink">{value ?? '—'}</p>
       <p className="text-sm font-semibold text-gray-500 mt-0.5">{label}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
     </div>
   )
 }
 
-/* ─── STATUS helpers ──────────────────────────────────────── */
-const STATUS_COLORS = {
-  pendiente: 'bg-gray-400', en_revision: 'bg-yellow-400', aprobado: 'bg-blue-400',
-  en_progreso: 'bg-orange-400', pausado: 'bg-gray-300', completado: 'bg-green-400', cancelado: 'bg-red-400',
+/* ─── STATUS helpers ──────────────────────────────────────────
+   Antes: dos mapas locales (STATUS_COLORS para el punto, STATUS_LABELS
+   para la píldora) que duplicaban y hacían divergir el color de estado
+   respecto al resto de la app. Ahora ambos se derivan del tono canónico
+   de design-system/status.js — el punto reutiliza el mismo `tone` que ya
+   resuelve StatusBadge, en vez de mantener su propia paleta por status. */
+const TONE_DOT = {
+  neutral: 'bg-gray-400',
+  caution: 'bg-yellow-400',
+  info: 'bg-blue-400',
+  warning: 'bg-orange-400',
+  success: 'bg-green-400',
+  error: 'bg-red-400',
 }
 function StatusDot({ status }) {
-  return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_COLORS[status] || 'bg-gray-300'}`} />
-}
-const STATUS_LABELS = {
-  pendiente: ['bg-gray-100','text-gray-600'], en_revision: ['bg-yellow-100','text-yellow-700'],
-  aprobado: ['bg-blue-100','text-blue-700'], en_progreso: ['bg-orange-100','text-orange-700'],
-  pausado: ['bg-gray-100','text-gray-500'], completado: ['bg-green-100','text-green-700'],
-  cancelado: ['bg-red-100','text-red-600'],
-}
-function StatusPill({ status }) {
-  const [bg, text] = STATUS_LABELS[status] || ['bg-gray-100','text-gray-500']
-  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full capitalize ${bg} ${text}`}>{status?.replace('_',' ')}</span>
+  const { tone } = getStatus(status)
+  return <div className={`w-2 h-2 rounded-full flex-shrink-0 ${TONE_DOT[tone] || TONE_DOT.neutral}`} />
 }
 
 /* ─── DASHBOARD (Supervisor overview) ─────────────────────── */
@@ -97,13 +101,13 @@ function DashboardView({ projects, quotes, workers, users }) {
   return (
     <div>
       <div className="flex items-center gap-3 mb-1">
-        <ShieldCheck size={22} className="text-[#E8432D]" />
-        <h1 className="text-2xl font-extrabold text-[#111]">Panel de Supervisión</h1>
+        <ShieldCheck size={22} className="text-brand" />
+        <h1 className="text-2xl font-extrabold text-ink">Panel de Supervisión</h1>
       </div>
       <p className="text-gray-400 text-sm mb-6">Estado global del sistema HOME</p>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard label="Proyectos activos"  value={inProgress}  icon={Activity}      color="bg-[#E8432D]" sub="en progreso" />
+        <StatCard label="Proyectos activos"  value={inProgress}  icon={Activity}      color="bg-brand" sub="en progreso" />
         <StatCard label="Completados"        value={completed}   icon={CheckCircle}   color="bg-green-500" sub="total histórico" />
         <StatCard label="Solicitudes pend."  value={pendingReqs} icon={Clock}         color="bg-amber-500" sub="en espera" />
         <StatCard label="Usuarios totales"   value={users?.length || 0} icon={Users}  color="bg-blue-500"  sub="registrados" />
@@ -113,42 +117,42 @@ function DashboardView({ projects, quotes, workers, users }) {
         {/* Proyectos recientes */}
         <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
           <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-            <h2 className="font-bold text-[14px] text-[#111] uppercase tracking-wider">Últimos Proyectos</h2>
+            <h2 className="font-bold text-[14px] text-ink uppercase tracking-wider">Últimos Proyectos</h2>
           </div>
           {projects?.slice(0, 6).map(p => (
             <div key={p.id} className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0">
               <StatusDot status={p.status} />
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-[13px] text-[#111] truncate">{p.title}</p>
+                <p className="font-semibold text-[13px] text-ink truncate">{p.title}</p>
                 <p className="text-[11px] text-gray-400">
                   {p.client?.name} → {p.worker?.name || 'Sin trabajador'}
                 </p>
               </div>
-              <StatusPill status={p.status} />
+              <StatusBadge status={p.status} />
             </div>
           ))}
         </div>
 
         {/* Distribución de Usuarios */}
         <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
-          <h2 className="font-bold text-[14px] text-[#111] uppercase tracking-wider mb-6">Resumen de Usuarios</h2>
+          <h2 className="font-bold text-[14px] text-ink uppercase tracking-wider mb-6">Resumen de Usuarios</h2>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-blue-500" />
                 <span className="text-sm font-semibold text-gray-600">Trabajadores</span>
               </div>
-              <span className="text-sm font-bold text-[#111]">{workers?.length || 0}</span>
+              <span className="text-sm font-bold text-ink">{workers?.length || 0}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-orange-500" />
                 <span className="text-sm font-semibold text-gray-600">Clientes</span>
               </div>
-              <span className="text-sm font-bold text-[#111]">{users?.filter(u => u.role === 'cliente').length || 0}</span>
+              <span className="text-sm font-bold text-ink">{users?.filter(u => u.role === 'cliente').length || 0}</span>
             </div>
             <div className="pt-4 border-t border-gray-50">
-              <div className="flex items-center justify-between text-[#111]">
+              <div className="flex items-center justify-between text-ink">
                 <span className="text-sm font-bold">Total Sistema</span>
                 <span className="text-lg font-black">{users?.length || 0}</span>
               </div>
@@ -168,13 +172,13 @@ function UsersView({ users }) {
 
   return (
     <div>
-      <h1 className="text-2xl font-extrabold text-[#111] mb-1">Usuarios</h1>
+      <h1 className="text-2xl font-extrabold text-ink mb-1">Usuarios</h1>
       <p className="text-gray-400 text-sm mb-6">Visualización de cuentas registradas</p>
       <div className="flex gap-2 pb-3 mb-4 overflow-x-auto">
         {['todos','cliente','trabajador'].map(f => (
           <button key={f} onClick={() => setFilter(f)}
             className={`flex-shrink-0 px-4 py-1.5 rounded-lg text-[12px] font-semibold capitalize transition-colors
-              ${filter === f ? 'bg-[#111] text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+              ${filter === f ? 'bg-ink text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
             {f === 'todos' ? 'Todos los registros' : f}
           </button>
         ))}
@@ -193,11 +197,11 @@ function UsersView({ users }) {
               <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50/80 transition-colors">
                 <td className="px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#E8432D]/10 flex items-center justify-center text-[#E8432D] font-bold text-[11px]">
+                    <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center text-brand font-bold text-[11px]">
                       {u.name?.[0]?.toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-[13px] text-[#111] truncate">{u.name}</p>
+                      <p className="font-bold text-[13px] text-ink truncate">{u.name}</p>
                       <p className="text-[11px] text-gray-400 truncate">{u.email}</p>
                     </div>
                   </div>
