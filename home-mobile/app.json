@@ -9,7 +9,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.samuelgomez.homeapp"
+      "bundleIdentifier": "com.samuelgomez.homeapp",
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.samuelgomez.homeapp",
@@ -25,10 +26,18 @@
     },
     "plugins": [
       "expo-web-browser",
+      "expo-apple-authentication",
       [
         "@react-native-google-signin/google-signin",
         {
           "iosUrlScheme": "com.googleusercontent.apps.622836904103-folvmcenrhp6br5r095hrm6n218imo4m"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HOME necesita acceso a tus fotos para subir fotos del proyecto o tu foto de perfil.",
+          "cameraPermission": "HOME necesita acceso a tu cámara para tomar fotos del proyecto o tu foto de perfil."
         }
       ]
     ]

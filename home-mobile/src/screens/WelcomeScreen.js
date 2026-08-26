@@ -1,12 +1,23 @@
 import React from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView,
-  ActivityIndicator, Alert, StatusBar,
+  View, Text, TouchableOpacity, ScrollView, Alert, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Home, Mail } from 'lucide-react-native';
+import { Mail } from 'lucide-react-native';
 import Svg, { G, Path } from 'react-native-svg';
 import { useGoogleAuth } from '../hooks/useGoogleAuth';
+import { useAppleAuth } from '../hooks/useAppleAuth';
+import { Button } from '../components/ui';
+
+/**
+ * Colores literales necesarios para props que no aceptan clases de Tailwind
+ * (StatusBar, íconos lucide-react-native).
+ */
+const ICON = {
+  brand: '#E8432D',   // = tokens.colors.brand.DEFAULT
+  surface: '#ffffff', // = tokens.colors.surface.DEFAULT
+  ink: '#111111',     // = tokens.colors.ink — react-native-svg no soporta className, requiere fill literal
+};
 
 /* ─── Logos ──────────────────────────────────────────────────────── */
 
@@ -31,10 +42,10 @@ function FacebookLogo() {
 
 function AppleLogo() {
   return (
-    <Svg width={22} height={22} viewBox="0 0 24 24">
+    <Svg width={27} height={24} viewBox="0 0 24 24">
       <G transform="translate(0.4 0.2) scale(1.08)">
         <Path
-          fill="#000"
+          fill={ICON.ink}
           d="M19.665 16.811a10.316 10.316 0 0 1-1.021 3.753c-.537 1.145-1.394 2.418-2.572 2.483-1.073.058-1.563-.601-3.074-.601-1.51 0-2.001.58-3.065.6-1.203.023-2.08-1.25-2.617-2.395C5.81 17.851 5.09 14.247 5.9 11.2a5.7 5.7 0 0 1 1.879-3.079 5.04 5.04 0 0 1 2.85-1.012c1.17 0 2.145.714 3.077.714.933 0 2.208-.863 3.616-.722a5.07 5.07 0 0 1 2.917 1.293c-2.533 1.52-2.591 4.797-.574 6.417zM16.028 5.7a4.884 4.884 0 0 1-3.428 1.602 4.3 4.3 0 0 1 1.159-3.194 5.17 5.17 0 0 1 3.307-1.617 4.61 4.61 0 0 1-1.038 3.21z"
         />
       </G>
@@ -46,25 +57,19 @@ function AppleLogo() {
 
 function SocialButton({ icon, label, onPress, disabled, loading }) {
   return (
-    <TouchableOpacity
+    <Button
+      variant="secondary"
+      fullWidth
+      loading={loading}
+      disabled={disabled}
+      accessibilityLabel={label}
       onPress={onPress}
-      disabled={disabled || loading}
-      activeOpacity={0.75}
-      className="flex-row items-center gap-4 bg-white rounded-2xl px-5 py-4 border border-gray-100"
-      style={{
-        opacity: (disabled || loading) ? 0.5 : 1,
-        shadowColor: '#000',
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 2 },
-        elevation: 2,
-      }}
     >
-      <View className="w-5 items-center justify-center">
-        {loading ? <ActivityIndicator size="small" color="#555" /> : icon}
+      <View className="flex-row items-center gap-4">
+        <View className="w-5 items-center justify-center">{icon}</View>
+        <Text className="font-semibold text-[15px] text-ink">{label}</Text>
       </View>
-      <Text className="font-semibold text-[15px] text-[#111]">{label}</Text>
-    </TouchableOpacity>
+    </Button>
   );
 }
 
@@ -73,13 +78,14 @@ function SocialButton({ icon, label, onPress, disabled, loading }) {
 ══════════════════════════════════════════════════════════════════ */
 export default function WelcomeScreen({ navigation }) {
   const { signInWithGoogle, googleReady, googleLoading } = useGoogleAuth();
+  const { signInWithApple, appleReady, appleLoading } = useAppleAuth();
 
   const comingSoon = (provider) =>
     Alert.alert('Próximamente', `El inicio de sesión con ${provider} estará disponible pronto.`);
 
   return (
     <View className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="dark-content" backgroundColor={ICON.surface} />
       <SafeAreaView className="flex-1">
         <ScrollView
           className="flex-1"
@@ -91,21 +97,15 @@ export default function WelcomeScreen({ navigation }) {
           {/* ── Logo ── */}
           <View className="items-center mb-10">
             <View className="flex-row items-center gap-3">
-              <View
-                className="w-12 h-12 bg-[#E8432D] rounded-2xl items-center justify-center"
-                style={{ shadowColor: '#E8432D', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }}
-              >
-                <Home size={22} color="#fff" strokeWidth={2.5} />
-              </View>
-              <Text className="text-[28px] font-extrabold text-[#111] tracking-tight">HOME</Text>
+              <Text className="text-[28px] font-extrabold text-ink tracking-tight">HOME</Text>
             </View>
           </View>
 
           {/* ── Título ── */}
           <View className="items-center mb-10">
-            <Text className="text-[26px] font-extrabold text-[#111] text-center leading-tight">
+            <Text className="text-[26px] font-extrabold text-ink text-center leading-tight">
               Gestiona tu hogar{'\n'}
-              <Text className="text-[#E8432D]">como un profesional</Text>
+              <Text className="text-brand">como un profesional</Text>
             </Text>
             <Text className="text-[14px] text-gray-400 text-center mt-3 leading-relaxed">
               Cotizaciones, proyectos y trabajadores del hogar{'\n'}
@@ -126,11 +126,14 @@ export default function WelcomeScreen({ navigation }) {
               label="Continuar con Facebook"
               onPress={() => comingSoon('Facebook')}
             />
-            <SocialButton
-              icon={<AppleLogo />}
-              label="Continuar con Apple"
-              onPress={() => comingSoon('Apple')}
-            />
+            {appleReady && (
+              <SocialButton
+                icon={<AppleLogo />}
+                label="Continuar con Apple"
+                onPress={signInWithApple}
+                loading={appleLoading}
+              />
+            )}
           </View>
 
           {/* ── Divisor ── */}
@@ -142,7 +145,7 @@ export default function WelcomeScreen({ navigation }) {
 
           {/* ── Correo ── */}
           <SocialButton
-            icon={<Mail size={20} color="#E8432D" strokeWidth={2} />}
+            icon={<Mail size={20} color={ICON.brand} strokeWidth={2} />}
             label="Continuar con correo"
             onPress={() => navigation.navigate('Register')}
           />
@@ -161,7 +164,7 @@ export default function WelcomeScreen({ navigation }) {
             <View className="flex-row items-center">
               <Text className="text-[14px] text-gray-500">¿Ya tienes cuenta? </Text>
               <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Login')}>
-                <Text className="text-[14px] text-[#E8432D] font-bold">Inicia sesión</Text>
+                <Text className="text-[14px] text-brand font-bold">Inicia sesión</Text>
               </TouchableOpacity>
             </View>
             <Text className="text-[11px] text-gray-400 text-center leading-relaxed">
