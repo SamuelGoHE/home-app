@@ -4,6 +4,9 @@ const { sequelize } = require('../config/database');
 const { User, WorkerProfile, Rating, Project } = require('../models');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { revokeAllRefreshTokens, blacklistAccessToken } = require('../utils/jwt');
+const { singlePhoto } = require('../middlewares/upload');
+const { uploadAvatar } = require('../utils/storage');
+const portfolioService = require('../services/workerPortfolioService');
 const router = express.Router();
 
 // Obtener un usuario por email (solo admin)
@@ -137,6 +140,7 @@ router.get('/workers/:id', authenticate, async (req, res, next) => {
       rating_count: reviewCount,
       completed_projects: completedProjects
     };
+    workerData.portfolio = await portfolioService.listPhotos(id);
 
     res.json({ success: true, data: workerData });
   } catch (error) {
@@ -173,6 +177,23 @@ router.patch('/me', authenticate, async (req, res, next) => {
   }
 });
 
+// Subir/reemplazar la foto de perfil del usuario autenticado
+router.post('/me/avatar', authenticate, singlePhoto('avatar'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'Falta la foto' });
+
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Usuario no encontrado' });
+
+    const { url } = await uploadAvatar(req.file, req.user.id);
+    await user.update({ avatar: url });
+
+    res.json({ success: true, data: user.toSafeJSON(), message: 'Foto de perfil actualizada' });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // Actualizar el perfil del trabajador autenticado
 router.put('/worker-profile', authenticate, async (req, res, next) => {
   try {
@@ -180,7 +201,12 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Solo los trabajadores pueden actualizar este perfil' });
     }
 
-    const { bio, years_experience, specialties, cities_covered } = req.body;
+    const { bio, years_experience, specialties, cities_covered, pricing_modes, daily_rate, contract_pricing_note } = req.body;
+
+    // pricing_modes solo admite 'por_dia'/'por_contrato'; si viene mal formado, se ignora en vez de fallar.
+    const safePricingModes = Array.isArray(pricing_modes)
+      ? pricing_modes.filter(m => ['por_dia', 'por_contrato'].includes(m))
+      : undefined;
 
     const workerProfile = await WorkerProfile.findOne({ where: { user_id: req.user.id } });
     if (!workerProfile) {
@@ -190,7 +216,10 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
         bio: bio || null,
         years_experience: years_experience || 0,
         specialties: specialties || [],
-        cities_covered: cities_covered || [req.user.city]
+        cities_covered: cities_covered || [req.user.city],
+        pricing_modes: safePricingModes || [],
+        daily_rate: daily_rate || null,
+        contract_pricing_note: contract_pricing_note || null,
       });
       return res.json({ success: true, data: newProfile, message: 'Perfil creado exitosamente' });
     }
@@ -200,11 +229,51 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
       bio: bio !== undefined ? bio : workerProfile.bio,
       years_experience: years_experience !== undefined ? years_experience : workerProfile.years_experience,
       specialties: specialties !== undefined ? specialties : workerProfile.specialties,
-      cities_covered: cities_covered !== undefined ? cities_covered : workerProfile.cities_covered
+      cities_covered: cities_covered !== undefined ? cities_covered : workerProfile.cities_covered,
+      pricing_modes: safePricingModes !== undefined ? safePricingModes : workerProfile.pricing_modes,
+      daily_rate: daily_rate !== undefined ? daily_rate : workerProfile.daily_rate,
+      contract_pricing_note: contract_pricing_note !== undefined ? contract_pricing_note : workerProfile.contract_pricing_note,
     });
 
     res.json({ success: true, data: workerProfile, message: 'Perfil actualizado exitosamente' });
   } catch (error) {
+    next(error);
+  }
+});
+
+// ── GET /users/me/portfolio — ver el portafolio propio (para administrarlo) ──
+router.get('/me/portfolio', authenticate, async (req, res, next) => {
+  try {
+    if (req.user.role !== 'trabajador') {
+      return res.status(403).json({ success: false, message: 'Solo los trabajadores tienen portafolio' });
+    }
+    res.json({ success: true, data: await portfolioService.listPhotos(req.user.id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── POST /users/me/portfolio — subir una foto al portafolio del trabajador autenticado ──
+router.post('/me/portfolio', authenticate, singlePhoto('photo'), async (req, res, next) => {
+  try {
+    if (req.user.role !== 'trabajador') {
+      return res.status(403).json({ success: false, message: 'Solo los trabajadores tienen portafolio' });
+    }
+    const photo = await portfolioService.addPhoto(req.user.id, req.file, req.body.specialty, req.body.caption, req.user);
+    res.status(201).json({ success: true, message: 'Foto agregada a tu portafolio', data: photo });
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
+    next(error);
+  }
+});
+
+// ── DELETE /users/me/portfolio/:photoId — borrar una foto del portafolio propio ──
+router.delete('/me/portfolio/:photoId', authenticate, async (req, res, next) => {
+  try {
+    await portfolioService.deletePhoto(req.params.photoId, req.user);
+    res.json({ success: true, message: 'Foto eliminada de tu portafolio' });
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     next(error);
   }
 });

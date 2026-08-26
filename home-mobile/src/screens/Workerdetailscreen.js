@@ -1,17 +1,29 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-    View, Text, ScrollView, TouchableOpacity,
-    Image, ActivityIndicator, Alert,
+    View, Text, ScrollView, Image, Alert, TouchableOpacity, Pressable, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
-    ArrowLeft, MapPin, Shield, Phone, MessageCircle,
+    MapPin, Shield, Phone, MessageCircle,
+    CalendarDays, FileSignature, Images, X,
 } from 'lucide-react-native';
 import { useWorker } from '../hooks/useApi';
 import { useAuthStore } from '../context/authStore';
+import {
+    Button, BackButton, LoadingState, EmptyState,
+} from '../components/ui';
 
 const AVATAR_FALLBACK =
     'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop';
+
+/**
+ * Colores literales necesarios para props `color`/`iconColor` de
+ * lucide-react-native — mismo patrón que Projectdetailscreen.js.
+ */
+const ICON = {
+    brand: '#E8432D',   // = tokens.colors.brand.DEFAULT
+    surface: '#ffffff', // = tokens.colors.surface.DEFAULT
+};
 
 const SERVICE_MAP = {
     pintura: 'Pintura Interior',
@@ -32,7 +44,7 @@ const SERVICE_MAP = {
 function StatBox({ label, value }) {
     return (
         <View className="flex-1 py-4 items-center border-r border-gray-100 last:border-0">
-            <Text className="text-[17px] font-extrabold text-[#111]">{value}</Text>
+            <Text className="text-[17px] font-extrabold text-ink">{value}</Text>
             <Text className="text-[11px] text-gray-400 mt-0.5">{label}</Text>
         </View>
     );
@@ -56,12 +68,14 @@ export default function WorkerDetailScreen({ route, navigation }) {
 
     const { isAuthenticated } = useAuthStore();
     const { data: worker, loading } = useWorker(workerId);
+    const [portfolioFilter, setPortfolioFilter] = useState(null);
+    const [viewerPhoto, setViewerPhoto] = useState(null);
 
     /* ── Loading ── */
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-white">
-                <ActivityIndicator size="large" color="#E8432D" />
+            <View className="flex-1 bg-white">
+                <LoadingState fullScreen />
             </View>
         );
     }
@@ -69,11 +83,12 @@ export default function WorkerDetailScreen({ route, navigation }) {
     /* ── Not found ── */
     if (!worker) {
         return (
-            <SafeAreaView className="flex-1 items-center justify-center gap-4 bg-white">
-                <Text className="text-gray-400 text-[15px]">Trabajador no encontrado</Text>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text className="text-[#E8432D] font-semibold">Volver</Text>
-                </TouchableOpacity>
+            <SafeAreaView className="flex-1 items-center justify-center bg-white px-8">
+                <EmptyState
+                    title="Trabajador no encontrado"
+                    action="Volver"
+                    onAction={() => navigation.goBack()}
+                />
             </SafeAreaView>
         );
     }
@@ -110,6 +125,9 @@ export default function WorkerDetailScreen({ route, navigation }) {
             sq_meters,
             occupied,
             notes,
+            workerPricingModes: profile.pricing_modes || [],
+            workerDailyRate: profile.daily_rate || '',
+            workerContractNote: profile.contract_pricing_note || '',
         });
     };
 
@@ -152,13 +170,11 @@ export default function WorkerDetailScreen({ route, navigation }) {
 
                     {/* Botón atrás */}
                     <SafeAreaView className="absolute top-0 left-0 right-0" edges={['top']}>
-                        <TouchableOpacity
+                        <BackButton
                             onPress={() => navigation.goBack()}
-                            className="m-4 w-9 h-9 items-center justify-center rounded-xl"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}
-                        >
-                            <ArrowLeft size={18} color="#fff" />
-                        </TouchableOpacity>
+                            iconColor={ICON.surface}
+                            className="m-4 !bg-white/20"
+                        />
                     </SafeAreaView>
 
                     {/* Nombre y ciudad sobre la foto */}
@@ -174,7 +190,7 @@ export default function WorkerDetailScreen({ route, navigation }) {
                         </View>
                         {profile.is_verified && (
                             <View className="flex-row items-center gap-1 bg-emerald-700 px-3 py-1.5 rounded-full">
-                                <Shield size={13} color="#fff" />
+                                <Shield size={13} color={ICON.surface} />
                                 <Text className="text-white text-[11px] font-bold">Verificado</Text>
                             </View>
                         )}
@@ -192,10 +208,43 @@ export default function WorkerDetailScreen({ route, navigation }) {
                 <View className="px-5 pt-5">
 
                     {/* Bio */}
-                    <Text className="font-bold text-[15px] text-[#111] mb-2">Sobre mí</Text>
+                    <Text className="font-bold text-[15px] text-ink mb-2">Sobre mí</Text>
                     <Text className="text-sm text-gray-500 leading-relaxed">
                         {profile.bio || 'Profesional dedicado y comprometido con la excelencia.'}
                     </Text>
+
+                    {/* Cómo cobra este trabajador */}
+                    {profile.pricing_modes?.length > 0 && (
+                        <View className="mt-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                            <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">
+                                Cómo cobra
+                            </Text>
+                            <View className="flex-row flex-wrap gap-2">
+                                {profile.pricing_modes.includes('por_dia') && (
+                                    <View className="flex-row items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5">
+                                        <CalendarDays size={13} color={ICON.brand} />
+                                        <Text className="text-[12px] font-bold text-ink">
+                                            Por día{profile.daily_rate ? ` · $${Number(profile.daily_rate).toLocaleString('es-CO')}` : ''}
+                                        </Text>
+                                    </View>
+                                )}
+                                {profile.pricing_modes.includes('por_contrato') && (
+                                    <View className="flex-row items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5">
+                                        <FileSignature size={13} color={ICON.brand} />
+                                        <Text className="text-[12px] font-bold text-ink">Por contrato</Text>
+                                    </View>
+                                )}
+                            </View>
+                            {profile.pricing_modes.includes('por_contrato') && profile.contract_pricing_note && (
+                                <Text className="text-[12px] text-gray-500 mt-2 leading-relaxed">
+                                    {profile.contract_pricing_note}
+                                </Text>
+                            )}
+                            <Text className="text-[11px] text-gray-400 mt-2">
+                                Precio fijo del trabajador — sin negociación.
+                            </Text>
+                        </View>
+                    )}
 
                     {/* Servicio a contratar */}
                     {serviceName && serviceName !== 'Servicio' && (
@@ -203,7 +252,7 @@ export default function WorkerDetailScreen({ route, navigation }) {
                             <Text className="text-[11px] font-bold text-orange-400 uppercase tracking-wide mb-0.5">
                                 Servicio a contratar
                             </Text>
-                            <Text className="text-[14px] font-bold text-[#111]">{serviceName}</Text>
+                            <Text className="text-[14px] font-bold text-ink">{serviceName}</Text>
                             {city && (
                                 <Text className="text-[12px] text-gray-500 mt-0.5">
                                     📍 {city}{address ? ` · ${address}` : ''}
@@ -225,7 +274,7 @@ export default function WorkerDetailScreen({ route, navigation }) {
                                         className={`px-4 py-3 bg-white ${idx < profile.specialties.length - 1 ? 'border-b border-gray-50' : ''
                                             }`}
                                     >
-                                        <Text className="text-[14px] font-semibold text-[#111]">
+                                        <Text className="text-[14px] font-semibold text-ink">
                                             {SERVICE_MAP[key] || key}
                                         </Text>
                                     </View>
@@ -234,24 +283,96 @@ export default function WorkerDetailScreen({ route, navigation }) {
                         </View>
                     )}
 
-                    {/* Botones secundarios */}
+                    {/* Portafolio */}
+                    {worker.portfolio && worker.portfolio.length > 0 && (() => {
+                        const portfolioSpecialties = [...new Set(worker.portfolio.map(p => p.specialty))];
+                        const filteredPhotos = portfolioFilter
+                            ? worker.portfolio.filter(p => p.specialty === portfolioFilter)
+                            : worker.portfolio;
+                        return (
+                            <View className="mt-5">
+                                <View className="flex-row items-center gap-2 mb-3">
+                                    <Images size={14} color={ICON.brand} />
+                                    <Text className="text-[12px] text-gray-400 font-extrabold uppercase tracking-wider">
+                                        Portafolio de trabajos
+                                    </Text>
+                                </View>
+
+                                {portfolioSpecialties.length > 1 && (
+                                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
+                                        <TouchableOpacity
+                                            onPress={() => setPortfolioFilter(null)}
+                                            className="mr-2 px-3.5 py-1.5 rounded-2xl border"
+                                            style={{ backgroundColor: !portfolioFilter ? ICON.brand : '#fff', borderColor: !portfolioFilter ? ICON.brand : '#e5e7eb' }}
+                                        >
+                                            <Text className={`text-[12px] font-bold ${!portfolioFilter ? 'text-white' : 'text-gray-500'}`}>Todos</Text>
+                                        </TouchableOpacity>
+                                        {portfolioSpecialties.map(key => {
+                                            const active = portfolioFilter === key;
+                                            return (
+                                                <TouchableOpacity
+                                                    key={key}
+                                                    onPress={() => setPortfolioFilter(active ? null : key)}
+                                                    className="mr-2 px-3.5 py-1.5 rounded-2xl border"
+                                                    style={{ backgroundColor: active ? ICON.brand : '#fff', borderColor: active ? ICON.brand : '#e5e7eb' }}
+                                                >
+                                                    <Text className={`text-[12px] font-bold ${active ? 'text-white' : 'text-gray-500'}`}>
+                                                        {SERVICE_MAP[key] || key}
+                                                    </Text>
+                                                </TouchableOpacity>
+                                            );
+                                        })}
+                                    </ScrollView>
+                                )}
+
+                                <View className="flex-row flex-wrap gap-2">
+                                    {filteredPhotos.map(photo => (
+                                        <TouchableOpacity
+                                            key={photo.id}
+                                            onPress={() => setViewerPhoto(photo)}
+                                            style={{ width: '31.5%', aspectRatio: 1 }}
+                                            accessibilityRole="imagebutton"
+                                            accessibilityLabel={photo.caption || 'Ver foto del portafolio'}
+                                            activeOpacity={0.85}
+                                        >
+                                            <Image source={{ uri: photo.url }} className="w-full h-full rounded-xl" resizeMode="cover" />
+                                            <View className="absolute bottom-1 left-1 right-1 bg-black/55 rounded-lg px-1.5 py-0.5">
+                                                <Text className="text-white text-[9px] font-bold text-center" numberOfLines={1}>
+                                                    {SERVICE_MAP[photo.specialty] || photo.specialty}
+                                                </Text>
+                                            </View>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                            </View>
+                        );
+                    })()}
+
+                    {/* Botones secundarios — Llamar/Chat: funcionalidad simulada (solo
+                        Alert), se preserva tal cual, solo se reskinea con Button. */}
                     <View className="flex-row gap-3 mt-6">
-                        <TouchableOpacity
+                        <Button
+                            variant="secondary"
+                            accessibilityLabel="Llamar"
+                            className="flex-1 !bg-gray-100 !border-0 !rounded-2xl"
                             onPress={handlePhone}
-                            className="flex-1 flex-row items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl"
-                            activeOpacity={0.75}
                         >
-                            <Phone size={16} color="#4b5563" />
-                            <Text className="text-[14px] font-semibold text-gray-600">Llamar</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
+                            <View className="flex-row items-center gap-2">
+                                <Phone size={16} color="#4b5563" />
+                                <Text className="text-[14px] font-semibold text-gray-600">Llamar</Text>
+                            </View>
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            accessibilityLabel="Chat"
+                            className="flex-1 !bg-gray-100 !border-0 !rounded-2xl"
                             onPress={handleChat}
-                            className="flex-1 flex-row items-center justify-center gap-2 py-3 bg-gray-100 rounded-2xl"
-                            activeOpacity={0.75}
                         >
-                            <MessageCircle size={16} color="#4b5563" />
-                            <Text className="text-[14px] font-semibold text-gray-600">Chat</Text>
-                        </TouchableOpacity>
+                            <View className="flex-row items-center gap-2">
+                                <MessageCircle size={16} color="#4b5563" />
+                                <Text className="text-[14px] font-semibold text-gray-600">Chat</Text>
+                            </View>
+                        </Button>
                     </View>
                 </View>
             </ScrollView>
@@ -261,18 +382,55 @@ export default function WorkerDetailScreen({ route, navigation }) {
                 className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-5 pt-4"
                 style={{ paddingBottom: 34 }}
             >
-                <TouchableOpacity
+                <Button
+                    variant="primary"
+                    fullWidth
+                    style={{ shadowColor: ICON.brand, shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }}
                     onPress={handleConfirm}
-                    className="w-full py-4 bg-[#E8432D] rounded-full items-center shadow-md"
-                    style={{ shadowColor: '#E8432D', shadowOpacity: 0.3, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }}
-                    activeOpacity={0.85}
                 >
-                    <Text className="text-white text-[17px] font-bold">Contratar a {firstName}</Text>
-                </TouchableOpacity>
+                    {`Contratar a ${firstName}`}
+                </Button>
                 <Text className="text-center text-[12px] text-gray-400 mt-2">
                     Elegirás las fechas en el siguiente paso
                 </Text>
             </View>
+
+            {/* ── Visor de foto del portafolio ── */}
+            <Modal visible={!!viewerPhoto} transparent animationType="fade" onRequestClose={() => setViewerPhoto(null)}>
+                <Pressable
+                    onPress={() => setViewerPhoto(null)}
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.95)' }}
+                >
+                    <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+                        <View className="flex-row justify-end px-4 pt-2">
+                            <Pressable
+                                onPress={() => setViewerPhoto(null)}
+                                accessibilityRole="button"
+                                accessibilityLabel="Cerrar"
+                                className="w-12 h-12 rounded-full bg-white/15 items-center justify-center"
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <X size={22} color="#fff" />
+                            </Pressable>
+                        </View>
+
+                        {viewerPhoto && (
+                            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 }}>
+                                <Image
+                                    source={{ uri: viewerPhoto.url }}
+                                    style={{ width: '100%', height: '70%' }}
+                                    resizeMode="contain"
+                                />
+                                {viewerPhoto.caption && (
+                                    <Text className="text-white text-[14px] text-center mt-4 px-4">
+                                        {viewerPhoto.caption}
+                                    </Text>
+                                )}
+                            </View>
+                        )}
+                    </SafeAreaView>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
