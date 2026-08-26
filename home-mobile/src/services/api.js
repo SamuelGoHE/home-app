@@ -1,8 +1,6 @@
 import axios from 'axios'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-
-// En móvil, baseURL no puede ser relativo. Usamos la IP de la red.
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.40.14:3000/api'
+import { API_URL } from '../utils/apiUrl'
 
 const api = axios.create({
   baseURL: API_URL,
