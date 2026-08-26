@@ -70,7 +70,52 @@ describe('projectService permission checks', () => {
 
     expect(Project.create).toHaveBeenCalled();
     expect(Task.create).toHaveBeenCalledWith(expect.objectContaining({ project_id: 'project-1', created_by: 'admin-1' }));
-    expect(quoteUpdate).toHaveBeenCalledWith({ status: 'aceptada', project_id: 'project-1' });
+    expect(quoteUpdate).toHaveBeenCalledWith({ status: 'aceptada', project_id: 'project-1', agreed_price: 1000000 });
     expect(result).toMatchObject({ id: 'quote-1', status: 'aceptada', project_id: 'project-1' });
+  });
+
+  test('client cannot accept or reject their own quote (worker-only action)', async () => {
+    Quote.findByPk.mockResolvedValue({
+      id: 'quote-1',
+      worker_id: 'worker-1',
+      client_id: 'client-1',
+      status: 'solicitud_pendiente',
+      estimated_price: 500000,
+      update: jest.fn(),
+    });
+
+    await expect(
+      svc.updateQuoteStatus('quote-1', 'aceptada', null, { id: 'client-1', role: 'cliente' })
+    ).rejects.toMatchObject({ statusCode: 403, message: 'Sin permiso' });
+  });
+
+  test('worker accepting a quote uses its fixed price as the project budget', async () => {
+    const quoteUpdate = jest.fn();
+    const quoteReload = jest.fn().mockResolvedValue({ id: 'quote-1', status: 'aceptada', project_id: 'project-2' });
+    Quote.findByPk.mockResolvedValue({
+      id: 'quote-1',
+      worker_id: 'worker-1',
+      client_id: 'client-1',
+      city: 'Medellin',
+      address: 'Calle 1',
+      sq_meters: null,
+      occupied: false,
+      start_date: null,
+      end_date: null,
+      service_id: 'service-1',
+      project_id: null,
+      status: 'solicitud_pendiente',
+      estimated_price: 700000,
+      service: { name: 'Plomería' },
+      update: quoteUpdate,
+      reload: quoteReload,
+    });
+    Project.create.mockResolvedValue({ id: 'project-2' });
+    Task.create.mockResolvedValue({ id: 'task-2' });
+
+    await svc.updateQuoteStatus('quote-1', 'aceptada', null, { id: 'worker-1', role: 'trabajador' });
+
+    expect(Project.create).toHaveBeenCalledWith(expect.objectContaining({ budget: 700000 }));
+    expect(quoteUpdate).toHaveBeenCalledWith({ status: 'aceptada', project_id: 'project-2', agreed_price: 700000 });
   });
 });

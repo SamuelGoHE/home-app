@@ -1,7 +1,9 @@
 const { Router } = require('express');
 const { body } = require('express-validator');
 const ctrl = require('../controllers/projectController');
+const photoCtrl = require('../controllers/projectPhotoController');
 const { authenticate, authorize } = require('../middlewares/auth');
+const { singlePhoto } = require('../middlewares/upload');
 
 const router = Router();
 router.use(authenticate);
@@ -31,6 +33,13 @@ router.patch('/projects/:id/status', authorize('admin', 'trabajador', 'cliente')
   body('status').isIn(['pendiente','en_revision','aprobado','en_progreso','pausado','completado','cancelado']).withMessage('Estado inválido'),
 ], ctrl.updateStatus);
 router.delete('/projects/:id', authorize('admin', 'cliente'), ctrl.deleteProject);
+
+// ── Fotos del proyecto (antes/durante/después) ──────────────
+router.get('/projects/:id/photos', photoCtrl.listPhotos);
+router.post('/projects/:id/photos', authorize('trabajador', 'admin'), singlePhoto('photo'), [
+  body('stage').isIn(['antes', 'durante', 'despues']).withMessage('Etapa inválida'),
+], photoCtrl.addPhoto);
+router.delete('/photos/:photoId', authorize('trabajador', 'admin'), photoCtrl.deletePhoto);
 
 // ── Tareas ─────────────────────────────────────────────────
 router.post('/tasks', authorize('admin', 'trabajador', 'cliente'), [

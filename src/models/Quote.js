@@ -10,7 +10,10 @@ const Quote = sequelize.define('Quote', {
   occupied:        { type: DataTypes.BOOLEAN, defaultValue: false },
   start_date:      { type: DataTypes.DATEONLY, allowNull: true },
   end_date:        { type: DataTypes.DATEONLY, allowNull: true },
-  estimated_price: { type: DataTypes.DECIMAL(14,2), allowNull: true },
+  estimated_price: { type: DataTypes.DECIMAL(14,2), allowNull: true }, // tarifa fija del trabajador para la modalidad elegida
+  pricing_type:    { type: DataTypes.ENUM('por_dia','por_contrato'), defaultValue: 'por_contrato' },
+  estimated_days:  { type: DataTypes.INTEGER, allowNull: true }, // solo aplica si pricing_type = 'por_dia'
+  agreed_price:    { type: DataTypes.DECIMAL(14,2), allowNull: true }, // se llena al aceptar — precio final del proyecto
   notes:           { type: DataTypes.TEXT, allowNull: true },
   expires_at:      { type: DataTypes.DATE, allowNull: true },
   client_id:       { type: DataTypes.UUID, allowNull: false },

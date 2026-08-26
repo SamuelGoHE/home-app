@@ -59,3 +59,18 @@ export function useWorker(id) {
   const result = useFetch(id ? `/users/workers/${id}` : null)
   return { ...result, data: result.data ?? null }
 }
+
+export function useRecentRatings(limit = 6) {
+  const result = useFetch('/ratings/recent', { limit }, [limit])
+  return { ...result, data: Array.isArray(result.data) ? result.data : null }
+}
+
+export function useProjectPhotos(projectId) {
+  const result = useFetch(projectId ? `/projects/${projectId}/photos` : null, {}, [projectId])
+  return { ...result, data: Array.isArray(result.data) ? result.data : null }
+}
+
+export function useConversations() {
+  const result = useFetch('/messages/conversations')
+  return { ...result, data: Array.isArray(result.data) ? result.data : null }
+}

@@ -53,5 +53,5 @@ module.exports = {
   getMyQuotes,
   getWorkerQuotes,
   updateQuoteStatus,
-  getAllQuotes
+  getAllQuotes,
 };

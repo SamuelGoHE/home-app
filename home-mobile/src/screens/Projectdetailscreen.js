@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
 import {
     View, Text, ScrollView, TouchableOpacity,
-    ActivityIndicator, Alert,
+    ActivityIndicator, Alert, Image, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import {
-    ArrowLeft, Calendar, MapPin, MessageCircle,
-    CheckCircle2, Clock, AlertCircle, Star,
-    Check, ChevronRight,
+    MapPin, MessageCircle, Star, Check, Camera, X, Calendar,
 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useProject } from '../hooks/useApi';
+import { useProject, useProjectPhotos } from '../hooks/useApi';
 import { useAuthStore } from '../context/authStore';
 import api from '../services/api';
+import { getStatus } from '../design-system/status.js';
+import {
+    Button, IconButton, BackButton, Card, StatusBadge,
+    LoadingState, ErrorState, EmptyState,
+} from '../components/ui';
+
+/* ─── Etapas de las fotos del proyecto ──────────────────────────── */
+const PHOTO_STAGES = [
+    { key: 'antes', label: 'Antes' },
+    { key: 'durante', label: 'Durante' },
+    { key: 'despues', label: 'Después' },
+];
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 function formatDate(d) {
@@ -21,32 +32,38 @@ function formatDate(d) {
     return format(new Date(d), "d MMM yyyy", { locale: es });
 }
 
-const STATUS_UI = {
-    pendiente: { label: 'Pendiente', textColor: '#4b5563', bg: '#f3f4f6', Icon: Clock },
-    en_revision: { label: 'En revisión', textColor: '#d97706', bg: '#fef3c7', Icon: AlertCircle },
-    aprobado: { label: 'Aprobado', textColor: '#2563eb', bg: '#dbeafe', Icon: CheckCircle2 },
-    en_progreso: { label: 'En progreso', textColor: '#ea580c', bg: '#ffedd5', Icon: Clock },
-    pausado: { label: 'Pausado', textColor: '#6b7280', bg: '#f3f4f6', Icon: AlertCircle },
-    completado: { label: 'Completado', textColor: '#059669', bg: '#d1fae5', Icon: CheckCircle2 },
-    cancelado: { label: 'Cancelado', textColor: '#dc2626', bg: '#fee2e2', Icon: AlertCircle },
-    completada: { label: 'Completada', textColor: '#059669', bg: '#d1fae5', Icon: CheckCircle2 },
+/**
+ * Colores literales necesarios para props `color`/`iconColor` de
+ * lucide-react-native (los íconos SVG no aceptan clases de Tailwind).
+ * Cada uno coincide exactamente con el token homónimo de
+ * design-system/tokens.js — se centralizan aquí en vez de repetir el hex
+ * suelto por el archivo.
+ */
+const ICON = {
+    muted: '#6b7280',   // = tokens.colors.muted
+    brand: '#E8432D',   // = tokens.colors.brand.DEFAULT
+    surface: '#ffffff', // = tokens.colors.surface.DEFAULT
 };
 
-const PRIORITY_DOT = {
-    baja: '#9ca3af',
-    media: '#3b82f6',
-    alta: '#f97316',
-    urgente: '#ef4444',
-};
+// Acento de calificación — deliberadamente fuera del mapa de status.js: el
+// amber está atado al concepto de "rating/estrellas", no a un estado de
+// proyecto (mismo criterio ya aplicado en WorkerProfileScreen.jsx, web).
+const RATING_COLOR = '#f59e0b';
 
-/* ─── Section card wrapper ───────────────────────────────────────── */
-function Section({ children, className = '' }) {
-    return (
-        <View className={`bg-white rounded-2xl border border-gray-100 p-4 ${className}`}>
-            {children}
-        </View>
-    );
-}
+/**
+ * Prioridad de tarea — mapa LOCAL de esta pantalla, deliberadamente
+ * separado de design-system/status.js (estado y prioridad son conceptos
+ * semánticamente distintos). Reutiliza los tonos ya existentes del design
+ * system (muted/info/warning/error) en vez de colores Tailwind sueltos.
+ * Si "prioridad" aparece en más pantallas, evaluar promoverlo a un
+ * concepto oficial del Design System — por ahora se queda local.
+ */
+const PRIORITY_UI = {
+    baja: { label: 'Baja', dotClass: 'bg-muted' },
+    media: { label: 'Media', dotClass: 'bg-info' },
+    alta: { label: 'Alta', dotClass: 'bg-warning' },
+    urgente: { label: 'Urgente', dotClass: 'bg-error' },
+};
 
 /* ─── Info row ───────────────────────────────────────────────────── */
 function InfoRow({ icon: Icon, label, value }) {
@@ -54,11 +71,11 @@ function InfoRow({ icon: Icon, label, value }) {
     return (
         <View className="flex-row items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
             <View className="w-7 h-7 rounded-xl bg-gray-50 items-center justify-center">
-                <Icon size={14} color="#9ca3af" />
+                <Icon size={14} color={ICON.muted} />
             </View>
             <View className="flex-1">
-                <Text className="text-[10px] text-gray-400 font-semibold uppercase tracking-wide">{label}</Text>
-                <Text className="text-[14px] text-[#111] font-semibold mt-0.5">{value}</Text>
+                <Text className="text-[10px] text-muted font-semibold uppercase tracking-wide">{label}</Text>
+                <Text className="text-[14px] text-ink font-semibold mt-0.5">{value}</Text>
             </View>
         </View>
     );
@@ -71,7 +88,11 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const { id } = route.params || {};
     const { user } = useAuthStore();
     const { data: project, loading, error, refetch } = useProject(id);
+    const { data: photos, loading: loadingPhotos, error: errorPhotos, refetch: refetchPhotos } = useProjectPhotos(id);
     const [updating, setUpdating] = useState(false);
+    const [photoStage, setPhotoStage] = useState('antes');
+    const [uploadingPhoto, setUploadingPhoto] = useState(false);
+    const [viewerPhoto, setViewerPhoto] = useState(null);
 
     /* ── Derived state ── */
     const tasks = project?.tasks || [];
@@ -86,11 +107,9 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const totalWeight = tasks.reduce((acc, t) => acc + getTaskWeight(t.status), 0);
     const pct = tasks.length ? Math.round((totalWeight / tasks.length) * 100) : 0;
 
-    const statusDef = project ? (STATUS_UI[project.status] || STATUS_UI.pendiente) : STATUS_UI.pendiente;
-    const { Icon: StatusIcon } = statusDef;
-
-    const assignedWorker = tasks.find(t => t.assignee)?.assignee;
+    const assignedWorker = project?.worker || tasks.find(t => t.assignee)?.assignee;
     const isCompleted = project?.status === 'completado';
+    const myRating = (project?.ratings || []).find(r => r.reviewer_id === user?.id);
 
     /* ── Worker action button ── */
     const workerAction = () => {
@@ -109,7 +128,7 @@ export default function ProjectDetailScreen({ route, navigation }) {
         if (updating) return;
         Alert.alert(
             'Confirmar cambio',
-            `¿Cambiar estado a "${STATUS_UI[newStatus]?.label}"?`,
+            `¿Cambiar estado a "${getStatus(newStatus).label}"?`,
             [
                 { text: 'Cancelar', style: 'cancel' },
                 {
@@ -131,23 +150,68 @@ export default function ProjectDetailScreen({ route, navigation }) {
         );
     };
 
+    /* ── Fotos del proyecto ── */
+    const canUploadPhotos = user?.role === 'trabajador' && project?.worker_id === user?.id;
+
+    const uploadPhoto = async (asset) => {
+        setUploadingPhoto(true);
+        try {
+            const formData = new FormData();
+            formData.append('photo', {
+                uri: asset.uri,
+                name: asset.fileName || `foto-${Date.now()}.jpg`,
+                type: asset.mimeType || 'image/jpeg',
+            });
+            formData.append('stage', photoStage);
+            await api.post(`/projects/${id}/photos`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            refetchPhotos();
+        } catch (err) {
+            Alert.alert('Error', err.response?.data?.message || 'No se pudo subir la foto. Intenta de nuevo.');
+        } finally {
+            setUploadingPhoto(false);
+        }
+    };
+
+    const pickImage = async (source) => {
+        const perm = source === 'camera'
+            ? await ImagePicker.requestCameraPermissionsAsync()
+            : await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+            Alert.alert('Permiso necesario', 'Debes conceder acceso para agregar una foto.');
+            return;
+        }
+        const options = { mediaTypes: ['images'], quality: 0.7 };
+        const result = source === 'camera'
+            ? await ImagePicker.launchCameraAsync(options)
+            : await ImagePicker.launchImageLibraryAsync(options);
+        if (result.canceled || !result.assets?.[0]) return;
+        await uploadPhoto(result.assets[0]);
+    };
+
+    const handleAddPhoto = () => {
+        Alert.alert('Agregar foto', `Etapa: ${PHOTO_STAGES.find(s => s.key === photoStage)?.label}`, [
+            { text: 'Tomar foto', onPress: () => pickImage('camera') },
+            { text: 'Elegir de la galería', onPress: () => pickImage('library') },
+            { text: 'Cancelar', style: 'cancel' },
+        ]);
+    };
+
     /* ── Loading ── */
     if (loading) {
         return (
-            <View className="flex-1 items-center justify-center bg-[#f8f9fb]">
-                <ActivityIndicator size="large" color="#E8432D" />
-            </View>
+            <SafeAreaView className="flex-1 bg-background">
+                <LoadingState fullScreen />
+            </SafeAreaView>
         );
     }
 
     /* ── Error ── */
     if (error) {
         return (
-            <SafeAreaView className="flex-1 items-center justify-center bg-[#f8f9fb] gap-4 px-8">
-                <Text className="text-[15px] text-gray-400 text-center">{error}</Text>
-                <TouchableOpacity onPress={refetch} className="px-6 py-3 bg-[#E8432D] rounded-2xl">
-                    <Text className="text-white font-bold">Reintentar</Text>
-                </TouchableOpacity>
+            <SafeAreaView className="flex-1 bg-background items-center justify-center px-8">
+                <ErrorState message={error} onRetry={refetch} />
             </SafeAreaView>
         );
     }
@@ -155,32 +219,28 @@ export default function ProjectDetailScreen({ route, navigation }) {
     /* ── Not found ── */
     if (!project) {
         return (
-            <SafeAreaView className="flex-1 items-center justify-center bg-[#f8f9fb] gap-3">
-                <Text className="text-[15px] text-gray-400">Proyecto no encontrado</Text>
-                <TouchableOpacity onPress={() => navigation.goBack()}>
-                    <Text className="text-[#E8432D] font-semibold">Volver</Text>
-                </TouchableOpacity>
+            <SafeAreaView className="flex-1 bg-background items-center justify-center px-8">
+                <EmptyState
+                    title="Proyecto no encontrado"
+                    action="Volver"
+                    onAction={() => navigation.goBack()}
+                />
             </SafeAreaView>
         );
     }
 
     /* ── Main render ── */
     return (
-        <SafeAreaView className="flex-1 bg-[#f8f9fb]">
+        <SafeAreaView className="flex-1 bg-background">
 
             {/* ── Sticky header ── */}
-            <View className="bg-white border-b border-gray-100 px-5 pt-2 pb-3 flex-row items-center gap-3">
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    className="w-9 h-9 items-center justify-center rounded-xl bg-gray-50 border border-gray-100"
-                >
-                    <ArrowLeft size={18} color="#4b5563" />
-                </TouchableOpacity>
+            <View className="bg-surface border-b border-border px-5 pt-2 pb-3 flex-row items-center gap-3">
+                <BackButton onPress={() => navigation.goBack()} />
                 <View className="flex-1">
-                    <Text className="text-[16px] font-extrabold text-[#111]" numberOfLines={1}>
+                    <Text className="text-[16px] font-extrabold text-ink" numberOfLines={1}>
                         {project.title}
                     </Text>
-                    <Text className="text-[12px] text-gray-400 font-medium" numberOfLines={1}>
+                    <Text className="text-[12px] text-muted font-medium" numberOfLines={1}>
                         {project.service?.name || 'Proyecto'}
                     </Text>
                 </View>
@@ -193,64 +253,54 @@ export default function ProjectDetailScreen({ route, navigation }) {
             >
 
                 {/* ── HERO / Status card ── */}
-                <Section>
-                    {/* Status badge */}
-                    <View
-                        className="self-start flex-row items-center gap-1.5 px-3 py-1.5 rounded-xl mb-3"
-                        style={{ backgroundColor: statusDef.bg }}
-                    >
-                        <StatusIcon size={13} color={statusDef.textColor} strokeWidth={2.5} />
-                        <Text className="text-[11px] font-extrabold uppercase tracking-wide"
-                            style={{ color: statusDef.textColor }}>
-                            {statusDef.label}
-                        </Text>
+                <Card padding="sm">
+                    <View className="mb-3">
+                        <StatusBadge status={project.status} />
                     </View>
 
-                    <Text className="text-[20px] font-extrabold text-[#111] mb-0.5">
+                    <Text className="text-[20px] font-extrabold text-ink mb-0.5">
                         {project.title}
                     </Text>
-                    <Text className="text-[13px] text-gray-500 font-medium mb-4">
+                    <Text className="text-[13px] text-muted font-medium mb-4">
                         {project.service?.name}
                     </Text>
 
-                    {/* Progress bar */}
+                    {/* Progreso — patrón canónico: brand en curso, success al completar */}
                     {tasks.length > 0 && (
                         <View>
                             <View className="flex-row justify-between items-end mb-2">
-                                <Text className="text-[12px] font-bold text-gray-500">Progreso general</Text>
-                                <Text className="text-[14px] font-extrabold text-[#111]">{pct}%</Text>
+                                <Text className="text-[12px] font-bold text-muted">Progreso general</Text>
+                                <Text className="text-[14px] font-extrabold text-ink">{pct}%</Text>
                             </View>
-                            <View className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                            <View className="h-2 bg-gray-100 rounded-full overflow-hidden">
                                 <View
-                                    className="h-full rounded-full bg-[#E8432D]"
+                                    className={`h-full rounded-full ${pct >= 100 ? 'bg-success' : 'bg-brand'}`}
                                     style={{ width: `${pct}%` }}
                                 />
                             </View>
-                            <Text className="text-[11px] text-gray-400 mt-2 text-right font-medium">
+                            <Text className="text-[11px] text-muted mt-2 text-right font-medium">
                                 {done} de {tasks.length} tareas completadas
                             </Text>
                         </View>
                     )}
-                </Section>
+                </Card>
 
                 {/* ── Worker action ── */}
                 {action && (
-                    <TouchableOpacity
-                        disabled={updating}
+                    <Button
+                        variant="primary"
+                        fullWidth
+                        loading={updating}
+                        accessibilityHint="Te pedirá confirmar antes de aplicar el cambio"
                         onPress={() => handleUpdateStatus(action.status)}
-                        className="w-full py-4 bg-[#E8432D] rounded-2xl items-center"
-                        style={{ opacity: updating ? 0.7 : 1 }}
                     >
-                        {updating
-                            ? <ActivityIndicator size="small" color="#fff" />
-                            : <Text className="text-white font-extrabold text-[15px]">{action.label}</Text>
-                        }
-                    </TouchableOpacity>
+                        {updating ? 'Actualizando...' : action.label}
+                    </Button>
                 )}
 
                 {/* ── Detalles del proyecto ── */}
-                <Section>
-                    <Text className="text-[13px] font-extrabold text-[#111] mb-1">Detalles</Text>
+                <Card padding="sm">
+                    <Text className="text-[13px] font-extrabold text-ink mb-1">Detalles</Text>
                     <InfoRow icon={Calendar} label="Fecha de inicio" value={formatDate(project.start_date)} />
                     {project.end_date && (
                         <InfoRow icon={Calendar} label="Fecha estimada fin" value={formatDate(project.end_date)} />
@@ -261,69 +311,160 @@ export default function ProjectDetailScreen({ route, navigation }) {
                     {project.city && (
                         <InfoRow icon={MapPin} label="Ciudad" value={project.city} />
                     )}
-                </Section>
+                </Card>
 
                 {/* ── Contacto (cliente ↔ trabajador) ── */}
                 {(assignedWorker || project.client) && (
-                    <Section>
-                        <Text className="text-[13px] font-extrabold text-[#111] mb-3">
+                    <Card padding="sm">
+                        <Text className="text-[13px] font-extrabold text-ink mb-3">
                             {user?.role === 'trabajador' ? 'Cliente' : 'Trabajador asignado'}
                         </Text>
 
                         <View className="flex-row items-center gap-3">
-                            {/* Avatar inicial */}
-                            <View className="w-11 h-11 rounded-full bg-[#E8432D] items-center justify-center">
-                                <Text className="text-white font-extrabold text-[16px]">
-                                    {(user?.role === 'trabajador'
-                                        ? project.client?.name
-                                        : assignedWorker?.name
-                                    )?.[0]?.toUpperCase() || '?'}
-                                </Text>
+                            {/* Avatar */}
+                            <View className="w-11 h-11 rounded-full bg-brand items-center justify-center overflow-hidden">
+                                {(user?.role === 'trabajador' ? project.client?.avatar : assignedWorker?.avatar) ? (
+                                    <Image
+                                        source={{ uri: user?.role === 'trabajador' ? project.client.avatar : assignedWorker.avatar }}
+                                        className="w-full h-full"
+                                        resizeMode="cover"
+                                    />
+                                ) : (
+                                    <Text className="text-white font-extrabold text-[16px]">
+                                        {(user?.role === 'trabajador'
+                                            ? project.client?.name
+                                            : assignedWorker?.name
+                                        )?.[0]?.toUpperCase() || '?'}
+                                    </Text>
+                                )}
                             </View>
 
                             <View className="flex-1">
-                                <Text className="text-[15px] font-extrabold text-[#111]">
+                                <Text className="text-[15px] font-extrabold text-ink">
                                     {user?.role === 'trabajador'
                                         ? project.client?.name
                                         : (assignedWorker?.name || 'Sin asignar')}
                                 </Text>
                                 {!assignedWorker && user?.role !== 'trabajador' && (
-                                    <Text className="text-[12px] text-gray-400">Pendiente de asignación</Text>
+                                    <Text className="text-[12px] text-muted">Pendiente de asignación</Text>
                                 )}
                             </View>
 
                             {/* Chat button */}
-                            <TouchableOpacity
+                            <IconButton
+                                icon={MessageCircle}
+                                variant="ghost"
+                                className="!bg-brand/10"
+                                iconColor={ICON.brand}
+                                accessibilityLabel="Enviar mensaje"
                                 onPress={() => navigation.navigate('Chat', { projectId: project.id })}
-                                className="w-10 h-10 rounded-xl bg-[#E8432D]/10 items-center justify-center"
-                            >
-                                <MessageCircle size={18} color="#E8432D" />
-                            </TouchableOpacity>
+                            />
                         </View>
-                    </Section>
+                    </Card>
                 )}
 
-                {/* ── Tareas ── */}
-                <Section>
+                {/* ── Fotos del proyecto ── */}
+                <Card padding="sm">
                     <View className="flex-row items-center justify-between mb-3">
-                        <Text className="text-[13px] font-extrabold text-[#111]">
+                        <Text className="text-[13px] font-extrabold text-ink">Fotos del proyecto</Text>
+                        {canUploadPhotos && (
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={uploadingPhoto}
+                                className="!bg-brand/10"
+                                accessibilityLabel="Agregar foto"
+                                onPress={handleAddPhoto}
+                            >
+                                <View className="flex-row items-center gap-1.5">
+                                    {uploadingPhoto
+                                        ? <ActivityIndicator size="small" color={ICON.brand} />
+                                        : <Camera size={14} color={ICON.brand} />
+                                    }
+                                    <Text className="text-[12px] font-bold text-brand">Agregar</Text>
+                                </View>
+                            </Button>
+                        )}
+                    </View>
+
+                    {/* Tabs de etapa */}
+                    <View className="flex-row gap-2 mb-3">
+                        {PHOTO_STAGES.map(s => {
+                            const count = (photos || []).filter(p => p.stage === s.key).length;
+                            const active = photoStage === s.key;
+                            return (
+                                <TouchableOpacity
+                                    key={s.key}
+                                    onPress={() => setPhotoStage(s.key)}
+                                    accessibilityRole="tab"
+                                    accessibilityState={{ selected: active }}
+                                    className={`flex-1 py-2 rounded-xl items-center ${active ? 'bg-brand' : 'bg-gray-100'}`}
+                                >
+                                    <Text className={`text-[12px] font-bold ${active ? 'text-white' : 'text-muted'}`}>
+                                        {s.label}{count > 0 ? ` (${count})` : ''}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    {loadingPhotos ? (
+                        <ActivityIndicator size="small" color={ICON.brand} style={{ paddingVertical: 16 }} />
+                    ) : errorPhotos ? (
+                        <View className="py-4 items-center">
+                            <Text className="text-[13px] text-error text-center mb-2">{errorPhotos}</Text>
+                            <Button variant="secondary" size="sm" onPress={refetchPhotos}>Reintentar</Button>
+                        </View>
+                    ) : (() => {
+                        const stagePhotos = (photos || []).filter(p => p.stage === photoStage);
+                        if (stagePhotos.length === 0) {
+                            return (
+                                <Text className="text-[13px] text-muted text-center py-6">
+                                    {canUploadPhotos
+                                        ? 'Aún no subes fotos de esta etapa.'
+                                        : 'Aún no hay fotos de esta etapa.'}
+                                </Text>
+                            );
+                        }
+                        return (
+                            <View className="flex-row flex-wrap gap-2">
+                                {stagePhotos.map((p, i) => (
+                                    <TouchableOpacity
+                                        key={p.id}
+                                        onPress={() => setViewerPhoto(p)}
+                                        accessibilityRole="imagebutton"
+                                        accessibilityLabel={`Ver foto ${i + 1} de ${stagePhotos.length}`}
+                                        style={{ width: '31.5%', aspectRatio: 1 }}
+                                        activeOpacity={0.85}
+                                    >
+                                        <Image source={{ uri: p.url }} className="w-full h-full rounded-xl" resizeMode="cover" />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        );
+                    })()}
+                </Card>
+
+                {/* ── Tareas ── */}
+                <Card padding="sm">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <Text className="text-[13px] font-extrabold text-ink">
                             Tareas
                         </Text>
-                        <Text className="text-[12px] font-bold text-gray-400">
+                        <Text className="text-[12px] font-bold text-muted">
                             {done}/{tasks.length}
                         </Text>
                     </View>
 
                     {tasks.length === 0 ? (
-                        <Text className="text-[13px] text-gray-400 text-center py-4">
+                        <Text className="text-[13px] text-muted text-center py-4">
                             No hay tareas para este proyecto.
                         </Text>
                     ) : (
                         <View className="gap-2">
                             {tasks.map(task => {
-                                const tDef = STATUS_UI[task.status] || STATUS_UI.pendiente;
                                 const isTaskDone = task.status === 'completada';
-                                const dotColor = PRIORITY_DOT[task.priority] || PRIORITY_DOT.media;
+                                const priorityDef = PRIORITY_UI[task.priority] || PRIORITY_UI.media;
 
                                 return (
                                     <View
@@ -332,16 +473,16 @@ export default function ProjectDetailScreen({ route, navigation }) {
                                     >
                                         {/* Checkbox visual */}
                                         <View className={`w-5 h-5 rounded-full mt-0.5 items-center justify-center border ${isTaskDone
-                                                ? 'bg-emerald-500 border-emerald-500'
-                                                : 'border-gray-300 bg-white'
+                                                ? 'bg-brand border-brand'
+                                                : 'border-gray-300 bg-surface'
                                             }`}>
-                                            {isTaskDone && <Check size={11} color="#fff" strokeWidth={3} />}
+                                            {isTaskDone && <Check size={11} color={ICON.surface} strokeWidth={3} />}
                                         </View>
 
                                         {/* Task info */}
                                         <View className="flex-1">
                                             <Text
-                                                className={`text-[14px] font-semibold ${isTaskDone ? 'text-gray-400 line-through' : 'text-[#111]'
+                                                className={`text-[14px] font-semibold ${isTaskDone ? 'text-muted line-through' : 'text-ink'
                                                     }`}
                                                 numberOfLines={2}
                                             >
@@ -349,24 +490,13 @@ export default function ProjectDetailScreen({ route, navigation }) {
                                             </Text>
 
                                             <View className="flex-row items-center gap-2 mt-1.5">
-                                                {/* Status chip */}
-                                                <View
-                                                    className="px-2 py-0.5 rounded-md"
-                                                    style={{ backgroundColor: tDef.bg }}
-                                                >
-                                                    <Text className="text-[10px] font-bold" style={{ color: tDef.textColor }}>
-                                                        {tDef.label}
-                                                    </Text>
-                                                </View>
+                                                <StatusBadge status={task.status} />
 
                                                 {/* Priority dot */}
                                                 {task.priority && (
                                                     <View className="flex-row items-center gap-1">
-                                                        <View
-                                                            className="w-2 h-2 rounded-full"
-                                                            style={{ backgroundColor: dotColor }}
-                                                        />
-                                                        <Text className="text-[10px] text-gray-400 capitalize">
+                                                        <View className={`w-2 h-2 rounded-full ${priorityDef.dotClass}`} />
+                                                        <Text className="text-[10px] text-muted capitalize">
                                                             {task.priority}
                                                         </Text>
                                                     </View>
@@ -378,28 +508,86 @@ export default function ProjectDetailScreen({ route, navigation }) {
                             })}
                         </View>
                     )}
-                </Section>
+                </Card>
 
-                {/* ── Calificar (cliente, proyecto completado) ── */}
+                {/* ── Calificación (cliente, proyecto completado) ── */}
                 {isCompleted && assignedWorker && user?.role === 'cliente' && (
-                    <TouchableOpacity
-                        onPress={() =>
-                            navigation.navigate('Rating', {
-                                projectId: project.id,
-                                workerId: assignedWorker.id,
-                                workerName: assignedWorker.name,
-                            })
-                        }
-                        className="w-full flex-row items-center justify-center gap-2.5 py-4 bg-amber-50 rounded-2xl border border-amber-100"
-                    >
-                        <Star size={18} color="#f59e0b" fill="#f59e0b" />
-                        <Text className="text-[14px] font-extrabold text-amber-600">
-                            Calificar a {assignedWorker.name.split(' ')[0]}
-                        </Text>
-                    </TouchableOpacity>
+                    myRating ? (
+                        <Card padding="sm">
+                            <Text className="text-[13px] font-extrabold text-ink mb-2">
+                                Tu calificación a {assignedWorker.name.split(' ')[0]}
+                            </Text>
+                            <View className="flex-row items-center gap-1 mb-2">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                    <Star
+                                        key={n}
+                                        size={18}
+                                        color={RATING_COLOR}
+                                        fill={n <= myRating.score ? RATING_COLOR : 'transparent'}
+                                    />
+                                ))}
+                                <Text className="text-[13px] font-bold text-muted ml-1">
+                                    {myRating.score}/5
+                                </Text>
+                            </View>
+                            {myRating.comment ? (
+                                <Text className="text-[13px] text-gray-600 leading-relaxed italic">
+                                    "{myRating.comment}"
+                                </Text>
+                            ) : null}
+                        </Card>
+                    ) : (
+                        <Button
+                            variant="secondary"
+                            fullWidth
+                            className="!bg-amber-50 !border-amber-100"
+                            accessibilityLabel={`Calificar a ${assignedWorker.name.split(' ')[0]}`}
+                            onPress={() =>
+                                navigation.navigate('Rating', {
+                                    projectId: project.id,
+                                    workerId: assignedWorker.id,
+                                    workerName: assignedWorker.name,
+                                    workerAvatar: assignedWorker.avatar,
+                                })
+                            }
+                        >
+                            <View className="flex-row items-center gap-2.5">
+                                <Star size={18} color={RATING_COLOR} fill={RATING_COLOR} />
+                                <Text className="text-[14px] font-extrabold text-amber-600">
+                                    Calificar a {assignedWorker.name.split(' ')[0]}
+                                </Text>
+                            </View>
+                        </Button>
+                    )
                 )}
 
             </ScrollView>
+
+            {/* ── Visor de foto a pantalla completa ── */}
+            <Modal visible={!!viewerPhoto} transparent animationType="fade" onRequestClose={() => setViewerPhoto(null)}>
+                <View className="flex-1 bg-black/90 items-center justify-center">
+                    <View className="absolute top-14 right-5 z-10">
+                        <IconButton
+                            icon={X}
+                            variant="ghost"
+                            className="!bg-white/10"
+                            iconColor={ICON.surface}
+                            accessibilityLabel="Cerrar foto"
+                            onPress={() => setViewerPhoto(null)}
+                        />
+                    </View>
+                    {viewerPhoto && (
+                        <Image
+                            source={{ uri: viewerPhoto.url }}
+                            style={{ width: '100%', height: '70%' }}
+                            resizeMode="contain"
+                        />
+                    )}
+                    {viewerPhoto?.caption && (
+                        <Text className="text-white text-[13px] px-8 mt-4 text-center">{viewerPhoto.caption}</Text>
+                    )}
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }

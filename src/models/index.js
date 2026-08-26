@@ -6,6 +6,8 @@ const Quote = require('./Quote');
 const WorkerProfile = require('./WorkerProfile');
 const Rating = require('./Rating');
 const Message = require('./Message');
+const ProjectPhoto = require('./ProjectPhoto');
+const WorkerPortfolioPhoto = require('./WorkerPortfolioPhoto');
 
 // WorkerProfile ↔ User
 User.hasOne(WorkerProfile, { foreignKey: 'user_id', as: 'workerProfile' });
@@ -58,4 +60,14 @@ Message.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
 User.hasMany(Message, { foreignKey: 'sender_id', as: 'sentMessages' });
 Message.belongsTo(User, { foreignKey: 'sender_id', as: 'sender' });
 
-module.exports = { User, Service, Project, Task, Quote, WorkerProfile, Rating, Message };
+// ProjectPhoto ↔ Project + User
+Project.hasMany(ProjectPhoto, { foreignKey: 'project_id', as: 'photos', onDelete: 'CASCADE' });
+ProjectPhoto.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+User.hasMany(ProjectPhoto, { foreignKey: 'uploaded_by', as: 'uploadedPhotos' });
+ProjectPhoto.belongsTo(User, { foreignKey: 'uploaded_by', as: 'uploader' });
+
+// WorkerPortfolioPhoto ↔ User
+User.hasMany(WorkerPortfolioPhoto, { foreignKey: 'worker_id', as: 'portfolioPhotos', onDelete: 'CASCADE' });
+WorkerPortfolioPhoto.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
+
+module.exports = { User, Service, Project, Task, Quote, WorkerProfile, Rating, Message, ProjectPhoto, WorkerPortfolioPhoto };

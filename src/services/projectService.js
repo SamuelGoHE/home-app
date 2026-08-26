@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Project, Task, Service, User, Quote } = require('../models');
+const { Project, Task, Service, User, Quote, WorkerProfile, Rating } = require('../models');
 
 // ── SERVICIOS ──────────────────────────────────────────────
 const getServices = async (category) => {
@@ -52,6 +52,7 @@ const getProjectById = async (id, user) => {
         ],
         order: [['created_at', 'ASC']],
       },
+      { model: Rating, as: 'ratings', attributes: ['id','score','comment','reviewer_id','worker_id','created_at'] },
     ],
   });
   if (!project) { const e = new Error('Proyecto no encontrado'); e.statusCode = 404; throw e; }
@@ -167,6 +168,12 @@ const assignTask = async (taskId, workerId) => {
 /**
  * Crea una solicitud de servicio dirigida a un trabajador específico.
  * Status inicial: 'solicitud_pendiente' — el trabajador debe aceptar o rechazar.
+ *
+ * El precio no lo escribe el cliente. Por día el trabajador ya publicó una tarifa fija
+ * (`daily_rate`) y esa es la `estimated_price` desde ya. Por contrato no hay un precio fijo
+ * posible (depende de m², materiales, alcance): el trabajador solo describe cómo cotiza
+ * (`contract_pricing_note`) y define el monto real al aceptar esta solicitud puntual —
+ * `estimated_price` queda en null hasta entonces.
  */
 const createQuote = async (data, clientId, io) => {
   const service = await Service.findByPk(data.service_id);
@@ -179,13 +186,38 @@ const createQuote = async (data, clientId, io) => {
   const client = await User.findByPk(clientId);
   if (!client) { const e = new Error('Cliente no encontrado'); e.statusCode = 404; throw e; }
 
+  const workerProfile = await WorkerProfile.findOne({ where: { user_id: data.worker_id } });
+  const pricingModes = workerProfile?.pricing_modes || [];
+  if (pricingModes.length === 0) {
+    const e = new Error('Este trabajador todavía no definió sus tarifas'); e.statusCode = 400; throw e;
+  }
+
+  const pricing_type = pricingModes.includes(data.pricing_type)
+    ? data.pricing_type
+    : pricingModes[0];
+
   let estimated_price = null;
-  if (service.base_price && data.sq_meters)
-    estimated_price = parseFloat(service.base_price) * parseFloat(data.sq_meters);
+  if (pricing_type === 'por_dia') {
+    estimated_price = workerProfile.daily_rate;
+    if (estimated_price == null) {
+      const e = new Error('Este trabajador no tiene definida una tarifa por día'); e.statusCode = 400; throw e;
+    }
+  } else if (!workerProfile.contract_pricing_note) {
+    const e = new Error('Este trabajador todavía no describió cómo cotiza sus contratos'); e.statusCode = 400; throw e;
+  }
 
   const quote = await Quote.create({
-    ...data,
+    city: data.city,
+    address: data.address,
+    sq_meters: data.sq_meters || null,
+    occupied: !!data.occupied,
+    start_date: data.start_date || null,
+    end_date: null,
+    notes: data.notes || null,
+    service_id: data.service_id,
+    worker_id: data.worker_id,
     client_id: clientId,
+    pricing_type,
     estimated_price,
     status: 'solicitud_pendiente',
     expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
@@ -252,7 +284,7 @@ const getAllQuotes = async () => {
  * Actualiza el estado de una solicitud.
  *
  * TRABAJADOR: solo puede cambiar sus propias solicitudes ('solicitud_pendiente' → 'aceptada' | 'rechazada').
- *   - Si acepta → crea el proyecto automáticamente.
+ *   - Si acepta → crea el proyecto automáticamente con la tarifa fija de la solicitud como `budget`.
  *   - Si rechaza → notifica al cliente.
  *
  * ADMIN: puede cambiar cualquier estado para supervisión.
@@ -278,6 +310,10 @@ const updateQuoteStatus = async (quoteId, status, estimatedPrice, user, io) => {
     if (quote.status !== 'solicitud_pendiente') {
       const e = new Error('Esta solicitud ya fue respondida'); e.statusCode = 409; throw e;
     }
+    // Por contrato no hay precio fijo desde la solicitud — el trabajador debe indicar el monto al aceptar.
+    if (status === 'aceptada' && quote.estimated_price == null && !estimatedPrice) {
+      const e = new Error('Indica el precio final antes de aceptar esta solicitud'); e.statusCode = 400; throw e;
+    }
   } else if (user.role === 'admin') {
     const allowed = ['revisada', 'aceptada', 'rechazada', 'expirada', 'solicitud_pendiente'];
     if (!allowed.includes(status)) { const e = new Error('Estado inválido'); e.statusCode = 400; throw e; }
@@ -291,7 +327,7 @@ const updateQuoteStatus = async (quoteId, status, estimatedPrice, user, io) => {
   if (status === 'aceptada' && !projectId) {
     try {
       const finalPrice = estimatedPrice || quote.estimated_price;
-      
+
       const project = await Project.create({
         title: `${quote.service?.name || 'Servicio'} · ${quote.city}`,
         description: quote.notes || 'Proyecto creado al aceptar la solicitud',
@@ -330,7 +366,7 @@ const updateQuoteStatus = async (quoteId, status, estimatedPrice, user, io) => {
           quoteId: quote.id,
           projectId: project.id,
           workerName: quote.worker?.name || 'El profesional',
-          message: `¡Tu solicitud fue aceptada! Ya puedes ver el proyecto.`,
+          message: '¡Tu solicitud fue aceptada! Ya puedes ver el proyecto.',
         });
       }
     } catch (error) {
@@ -340,19 +376,18 @@ const updateQuoteStatus = async (quoteId, status, estimatedPrice, user, io) => {
   }
 
   // ── Si se rechaza → notificar al cliente ──
-  if (status === 'rechazada') {
-    if (io) {
-      io.to(`user:${quote.client_id}`).emit('request_response', {
-        type: 'rechazada',
-        quoteId: quote.id,
-        workerName: quote.worker?.name || 'El profesional',
-        message: `Tu solicitud fue rechazada. Puedes elegir otro profesional.`,
-      });
-    }
+  if (status === 'rechazada' && io) {
+    io.to(`user:${quote.client_id}`).emit('request_response', {
+      type: 'rechazada',
+      quoteId: quote.id,
+      workerName: quote.worker?.name || 'El profesional',
+      message: 'Tu solicitud fue rechazada. Puedes elegir otro profesional.',
+    });
   }
 
   const updates = { status, project_id: projectId };
   if (estimatedPrice) updates.estimated_price = estimatedPrice;
+  if (status === 'aceptada') updates.agreed_price = estimatedPrice || quote.estimated_price;
 
   await quote.update(updates);
   return quote.reload({
@@ -369,7 +404,6 @@ const updateQuoteStatus = async (quoteId, status, estimatedPrice, user, io) => {
 const getWorkers = async (city) => {
   const where = { role: 'trabajador', is_active: true };
   if (city) where.city = { [Op.iLike]: `%${city}%` };
-  const { WorkerProfile } = require('../models');
   return User.findAll({
     where,
     attributes: ['id','name','email','phone','avatar','city','rating_avg','rating_count'],
