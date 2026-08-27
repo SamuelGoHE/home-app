@@ -1,0 +1,43 @@
+# Normalización de saltos de línea entre Windows y macOS/Linux.
+# Git detecta automáticamente qué es texto y qué es binario, y normaliza
+# los archivos de texto a LF en el repositorio (independiente de cómo
+# los checkee cada colaborador según su configuración local de autocrlf).
+* text=auto eol=lf
+
+# Forzar LF explícito en los tipos de archivo de código y config del proyecto,
+# para que no dependa de la detección automática.
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sql   text eol=lf
+.env.example text eol=lf
+
+# Scripts que sí necesitan terminar en CRLF en Windows (ninguno en este repo hoy,
+# se deja documentado por si se agrega un .bat/.cmd más adelante).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binarios: nunca deben pasar por normalización de line endings.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf  binary
+*.otf  binary
+*.pdf  binary
+
+# package-lock.json: se trata como texto con LF forzado (ya cubierto arriba
+# por *.json), se deja explícito por ser un archivo sensible a diffs entre
+# máquinas con distinta versión de npm.
+package-lock.json text eol=lf -diff
