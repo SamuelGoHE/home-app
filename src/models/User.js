@@ -8,7 +8,7 @@ const User = sequelize.define('User', {
   email:                 { type: DataTypes.STRING(150), allowNull: false, unique: true, validate: { isEmail: true } },
   password:              { type: DataTypes.STRING, allowNull: true },
   phone:                 { type: DataTypes.STRING(20), allowNull: true },
-  role:                  { type: DataTypes.ENUM('cliente', 'trabajador', 'admin'), defaultValue: 'cliente' },
+  role:                  { type: DataTypes.ENUM('cliente', 'trabajador', 'admin', 'admin_finanzas'), defaultValue: 'cliente' },
   avatar:                { type: DataTypes.STRING, allowNull: true },
   city:                  { type: DataTypes.STRING(100), allowNull: true },
   address:               { type: DataTypes.STRING(200), allowNull: true },

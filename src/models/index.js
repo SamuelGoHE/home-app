@@ -8,6 +8,10 @@ const Rating = require('./Rating');
 const Message = require('./Message');
 const ProjectPhoto = require('./ProjectPhoto');
 const WorkerPortfolioPhoto = require('./WorkerPortfolioPhoto');
+const WorkerPayoutAccount = require('./WorkerPayoutAccount');
+const Payment = require('./Payment');
+const Payout = require('./Payout');
+const Refund = require('./Refund');
 
 // WorkerProfile ↔ User
 User.hasOne(WorkerProfile, { foreignKey: 'user_id', as: 'workerProfile' });
@@ -70,4 +74,37 @@ ProjectPhoto.belongsTo(User, { foreignKey: 'uploaded_by', as: 'uploader' });
 User.hasMany(WorkerPortfolioPhoto, { foreignKey: 'worker_id', as: 'portfolioPhotos', onDelete: 'CASCADE' });
 WorkerPortfolioPhoto.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
 
-module.exports = { User, Service, Project, Task, Quote, WorkerProfile, Rating, Message, ProjectPhoto, WorkerPortfolioPhoto };
+// WorkerPayoutAccount ↔ User (trabajador dueño + admin_finanzas que verifica)
+User.hasOne(WorkerPayoutAccount, { foreignKey: 'worker_id', as: 'payoutAccount', onDelete: 'CASCADE' });
+WorkerPayoutAccount.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
+User.hasMany(WorkerPayoutAccount, { foreignKey: 'verified_by', as: 'verifiedPayoutAccounts' });
+WorkerPayoutAccount.belongsTo(User, { foreignKey: 'verified_by', as: 'verifier' });
+
+// Payment ↔ Project + User (cliente)
+Project.hasMany(Payment, { foreignKey: 'project_id', as: 'payments', onDelete: 'CASCADE' });
+Payment.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+User.hasMany(Payment, { foreignKey: 'client_id', as: 'payments' });
+Payment.belongsTo(User, { foreignKey: 'client_id', as: 'client' });
+
+// Payout ↔ Project + User (trabajador + admin_finanzas que aprueba)
+Project.hasOne(Payout, { foreignKey: 'project_id', as: 'payout', onDelete: 'CASCADE' });
+Payout.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+User.hasMany(Payout, { foreignKey: 'worker_id', as: 'payouts' });
+Payout.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
+User.hasMany(Payout, { foreignKey: 'approved_by', as: 'approvedPayouts' });
+Payout.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+
+// Refund ↔ Project + User (cliente) + Payment (el pago inicial reembolsado)
+Project.hasMany(Refund, { foreignKey: 'project_id', as: 'refunds', onDelete: 'CASCADE' });
+Refund.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+User.hasMany(Refund, { foreignKey: 'client_id', as: 'refunds' });
+Refund.belongsTo(User, { foreignKey: 'client_id', as: 'client' });
+User.hasMany(Refund, { foreignKey: 'approved_by', as: 'approvedRefunds' });
+Refund.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+Payment.hasOne(Refund, { foreignKey: 'payment_id', as: 'refund' });
+Refund.belongsTo(Payment, { foreignKey: 'payment_id', as: 'payment' });
+
+module.exports = {
+  User, Service, Project, Task, Quote, WorkerProfile, Rating, Message,
+  ProjectPhoto, WorkerPortfolioPhoto, WorkerPayoutAccount, Payment, Payout, Refund,
+};
