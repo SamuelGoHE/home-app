@@ -91,6 +91,17 @@ describe('paymentService.createInitialPayment', () => {
     }));
     expect(result).toEqual({ paymentId: 'pay1', url: 'https://checkout.wompi.co/l/link-123' });
   });
+
+  test('wraps a Wompi API failure into a clean 502 instead of leaking the raw axios error', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p1', client_id: 'c1', status: 'pendiente', budget: 100000, title: 'Pintura' });
+    Payment.findOne.mockResolvedValue(null);
+    wompi.post.mockRejectedValue({ response: { status: 401, data: { error: { reason: 'Llave no válida' } } } });
+
+    await expect(
+      svc.createInitialPayment('p1', { id: 'c1', role: 'cliente' })
+    ).rejects.toMatchObject({ statusCode: 502 });
+    expect(Payment.create).not.toHaveBeenCalled();
+  });
 });
 
 describe('paymentService.getPaymentStatus', () => {

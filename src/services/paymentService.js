@@ -23,15 +23,25 @@ const assertClientOwnsProject = (project, user) => {
 
 const createPaymentLink = async ({ reference, amountInCents, name, description }) => {
   if (!wompi) { const e = new Error('Wompi no configurado (faltan WOMPI_PRIVATE_KEY/WOMPI_PUBLIC_KEY)'); e.statusCode = 500; throw e; }
-  const { data } = await wompi.post('/payment_links', {
-    name,
-    description,
-    single_use: true,
-    collect_shipping: false,
-    currency: 'COP',
-    amount_in_cents: amountInCents,
-    reference,
-  });
+
+  let data;
+  try {
+    ({ data } = await wompi.post('/payment_links', {
+      name,
+      description,
+      single_use: true,
+      collect_shipping: false,
+      currency: 'COP',
+      amount_in_cents: amountInCents,
+      reference,
+    }));
+  } catch (err) {
+    // No exponer el error crudo de axios (puede incluir detalles de la
+    // llamada) — lo dejamos en el log del servidor y devolvemos algo genérico.
+    console.error('[Wompi] error creando payment link:', err.response?.data || err.message);
+    const e = new Error('No se pudo crear el link de pago con Wompi'); e.statusCode = 502; throw e;
+  }
+
   const linkId = data?.data?.id;
   if (!linkId) { const e = new Error('Wompi no devolvió un link de pago válido'); e.statusCode = 502; throw e; }
   return `https://checkout.wompi.co/l/${linkId}`;

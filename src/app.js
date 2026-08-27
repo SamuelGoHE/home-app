@@ -53,11 +53,18 @@ app.use('/api/auth', authRoutes);
 app.use('/api/services', servicesRoutes);
 app.use('/api/quotes', quotesRoutes);
 app.use('/api/tasks', tasksRoutes);
+// payments va ANTES del catch-all '/api' de projectRoutes: su webhook de
+// Wompi debe ser público (Wompi nunca manda nuestro JWT) y projectRoutes
+// tiene un router.use(authenticate) sin path que, al montarse en '/api',
+// interceptaría cualquier ruta más específica registrada después de él
+// (ver [[backend-route-shadowing]] en memoria — mismo problema, más amplio
+// de lo documentado ahí: también afecta a /api/ratings/worker/:id, pensado
+// como público, y en general a cualquier ruta pública montada después).
+app.use('/api/payments', paymentsRoutes);
 app.use('/api', projectRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/messages', messagesRoutes);
-app.use('/api/payments', paymentsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

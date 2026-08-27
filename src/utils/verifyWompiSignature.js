@@ -29,7 +29,7 @@ const verifyWompiSignature = (payload) => {
     .update(`${concatenated}${timestamp}${eventsSecret}`)
     .digest('hex');
 
-  return expected === signature.checksum;
+  return expected.toLowerCase() === String(signature.checksum).toLowerCase();
 };
 
 module.exports = { verifyWompiSignature };

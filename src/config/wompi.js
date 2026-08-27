@@ -1,10 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const WOMPI_ENV = process.env.WOMPI_ENV || 'sandbox';
-const baseURL = WOMPI_ENV === 'production'
-  ? 'https://production.wompi.co/v1'
-  : 'https://sandbox.wompi.co/v1';
+const baseURL = process.env.WOMPI_API_URL || 'https://sandbox.wompi.co/v1';
 
 const publicKey = process.env.WOMPI_PUBLIC_KEY;
 const privateKey = process.env.WOMPI_PRIVATE_KEY;
@@ -21,4 +18,4 @@ const wompi = privateKey
     })
   : null;
 
-module.exports = { wompi, WOMPI_ENV, publicKey, privateKey, eventsSecret, integritySecret };
+module.exports = { wompi, baseURL, publicKey, privateKey, eventsSecret, integritySecret };
