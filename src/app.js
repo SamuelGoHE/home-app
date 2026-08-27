@@ -17,6 +17,7 @@ const tasksRoutes = require('./routes/tasks');
 const usersRoutes = require('./routes/users');
 const messagesRoutes = require('./routes/messages');
 const paymentsRoutes = require('./routes/payments');
+const payoutsRoutes = require('./routes/payouts');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 const app = express();
@@ -61,6 +62,7 @@ app.use('/api/tasks', tasksRoutes);
 // de lo documentado ahí: también afecta a /api/ratings/worker/:id, pensado
 // como público, y en general a cualquier ruta pública montada después).
 app.use('/api/payments', paymentsRoutes);
+app.use('/api/payouts', payoutsRoutes);
 app.use('/api', projectRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', usersRoutes);

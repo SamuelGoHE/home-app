@@ -6,7 +6,7 @@ export function ProtectedRoute({ allowedRoles }) {
   const { isAuthenticated, user } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/welcome" replace />
   if (allowedRoles && !allowedRoles.includes(user?.role)) {
-    if (user?.role === 'admin')      return <Navigate to="/admin" replace />
+    if (user?.role === 'admin' || user?.role === 'admin_finanzas') return <Navigate to="/admin" replace />
     if (user?.role === 'trabajador') return <Navigate to="/worker" replace />
     return <Navigate to="/home" replace />
   }

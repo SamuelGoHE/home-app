@@ -5,32 +5,39 @@ import api from '../services/api'
 import {
   LayoutDashboard, Users,
   ShieldCheck, LogOut, CheckCircle,
-  Clock, Activity
+  Clock, Activity, Wallet, Landmark
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { StatusBadge } from '../components/common'
 import { getStatus } from '../design-system/status.js'
 
-const NAV = [
+const ADMIN_NAV = [
   { id: 'dashboard', label: 'Dashboard',    icon: LayoutDashboard },
   { id: 'users',     label: 'Usuarios',     icon: Users },
+]
+
+// admin_finanzas solo ve Finanzas — es justo el punto del rol (separar quién
+// puede crear/supervisar de quién puede aprobar que salga dinero real).
+const FINANZAS_NAV = [
+  { id: 'finanzas', label: 'Finanzas', icon: Wallet },
 ]
 
 /* ─── Sidebar ─────────────────────────────────────────────── */
 /* Estructura fija/no responsive intencionalmente sin tocar en esta fase —
    solo se tokenizan colores (#111 → ink, #E8432D → brand). */
-function Sidebar({ active, setActive, user, onLogout }) {
+function Sidebar({ nav, active, setActive, user, onLogout }) {
+  const isFinanzas = user?.role === 'admin_finanzas'
   return (
     <div className="w-56 bg-ink min-h-screen flex flex-col flex-shrink-0">
       <div className="px-5 pt-8 pb-6 border-b border-white/10">
         <div className="flex items-center gap-2 mb-3">
-          <ShieldCheck size={18} className="text-brand" />
-          <span className="text-white font-bold text-[13px]">Panel Supervisor</span>
+          {isFinanzas ? <Wallet size={18} className="text-brand" /> : <ShieldCheck size={18} className="text-brand" />}
+          <span className="text-white font-bold text-[13px]">{isFinanzas ? 'Panel Finanzas' : 'Panel Supervisor'}</span>
         </div>
         <p className="text-white/40 text-[10px] font-semibold uppercase tracking-widest">HOME Admin</p>
       </div>
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-        {NAV.map(({ id, label, icon: Icon }) => (
+        {nav.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setActive(id)}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all
               ${active === id ? 'bg-brand text-white' : 'text-white/50 hover:text-white hover:bg-white/10'}`}>
@@ -46,7 +53,7 @@ function Sidebar({ active, setActive, user, onLogout }) {
           </div>
           <div className="min-w-0">
             <p className="text-white text-[12px] font-semibold truncate">{user?.name}</p>
-            <p className="text-white/40 text-[10px] truncate">Supervisor</p>
+            <p className="text-white/40 text-[10px] truncate">{isFinanzas ? 'Finanzas' : 'Supervisor'}</p>
           </div>
         </div>
         <button onClick={onLogout}
@@ -227,15 +234,121 @@ function UsersView({ users }) {
   )
 }
 
+/* ─── FINANZAS (admin_finanzas) ─────────────────────────────
+   Aprobar payouts y verificar cuentas bancarias — el envío real a Wompi
+   (payoutService.sendWompiPayout) todavía no está implementado (su API de
+   Payouts está detrás de un login que no pudimos verificar), así que
+   "Aprobar" hoy siempre responde con ese error explícito — es esperado,
+   no un bug: el resto del flujo (elegibilidad, verificación de cuenta,
+   estados) ya está completo y listo para cuando se conecte de verdad. */
+const formatCOP = (n) =>
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n || 0)
+
+const PAYOUT_STATUS_LABEL = {
+  pendiente: 'Pendiente', aprobado: 'Aprobado', enviado: 'Enviado',
+  completado: 'Completado', fallido: 'Fallido',
+}
+const PAYOUT_STATUS_CLASS = {
+  pendiente: 'bg-amber-100 text-amber-700', aprobado: 'bg-blue-100 text-blue-700',
+  enviado: 'bg-blue-100 text-blue-700', completado: 'bg-green-100 text-green-700',
+  fallido: 'bg-red-100 text-red-700',
+}
+
+function FinanzasView({ accounts, payouts, onVerifyAccount, onApprovePayout, approvingId }) {
+  const [statusFilter, setStatusFilter] = useState('todos')
+  const filteredPayouts = statusFilter === 'todos' ? payouts : payouts?.filter(p => p.status === statusFilter)
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-1">
+        <Wallet size={22} className="text-brand" />
+        <h1 className="text-2xl font-extrabold text-ink">Finanzas</h1>
+      </div>
+      <p className="text-gray-400 text-sm mb-6">Cuentas bancarias y pagos a trabajadores</p>
+
+      {/* Cuentas por verificar */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm mb-6">
+        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
+          <h2 className="font-bold text-[14px] text-ink uppercase tracking-wider">Cuentas por verificar</h2>
+          <span className="text-[11px] font-bold text-gray-400">{accounts?.length || 0}</span>
+        </div>
+        {(!accounts || accounts.length === 0) ? (
+          <div className="py-10 text-center text-gray-400 text-sm">No hay cuentas pendientes de revisión</div>
+        ) : accounts.map(a => (
+          <div key={a.id} className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0">
+            <Landmark size={16} className="text-gray-400 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-[13px] text-ink truncate">{a.worker?.name}</p>
+              <p className="text-[11px] text-gray-400 truncate">{a.bank_name} · terminada en {a.account_number_last4} · {a.worker?.email}</p>
+            </div>
+            <button onClick={() => onVerifyAccount(a.id)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-green-50 text-green-700 hover:bg-green-100 transition-colors">
+              Verificar
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Payouts */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+          <h2 className="font-bold text-[14px] text-ink uppercase tracking-wider mb-3">Payouts a trabajadores</h2>
+          <div className="flex gap-2 overflow-x-auto">
+            {['todos', 'pendiente', 'enviado', 'completado', 'fallido'].map(f => (
+              <button key={f} onClick={() => setStatusFilter(f)}
+                className={`flex-shrink-0 px-3 py-1 rounded-lg text-[11px] font-semibold capitalize transition-colors
+                  ${statusFilter === f ? 'bg-ink text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+        {(!filteredPayouts || filteredPayouts.length === 0) ? (
+          <div className="py-10 text-center text-gray-400 text-sm">No hay payouts en este estado</div>
+        ) : filteredPayouts.map(p => {
+          const eligible = new Date(p.eligible_at) <= new Date()
+          return (
+            <div key={p.id} className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-[13px] text-ink truncate">{p.worker?.name}</p>
+                <p className="text-[11px] text-gray-400 truncate">{p.project?.title} · {formatCOP(p.amount)}</p>
+                {p.status === 'pendiente' && !eligible && (
+                  <p className="text-[10px] text-amber-600 mt-0.5 flex items-center gap-1">
+                    <Clock size={10} /> Elegible desde {new Date(p.eligible_at).toLocaleString('es-CO')}
+                  </p>
+                )}
+              </div>
+              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${PAYOUT_STATUS_CLASS[p.status]}`}>
+                {PAYOUT_STATUS_LABEL[p.status]}
+              </span>
+              {p.status === 'pendiente' && eligible && (
+                <button onClick={() => onApprovePayout(p.id)} disabled={approvingId === p.id}
+                  className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-brand/10 text-brand hover:bg-brand/20 transition-colors disabled:opacity-50">
+                  {approvingId === p.id ? 'Enviando...' : 'Aprobar'}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 /* ─── MAIN ────────────────────────────────────────────────── */
 export default function AdminDashboard() {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
-  const [active, setActive] = useState('dashboard')
+  const isFinanzas = user?.role === 'admin_finanzas'
+  const nav = isFinanzas ? FINANZAS_NAV : ADMIN_NAV
+  const [active, setActive] = useState(isFinanzas ? 'finanzas' : 'dashboard')
   const [projects, setProjects] = useState([])
   const [quotes,   setQuotes]   = useState([])
   const [workers,  setWorkers]  = useState([])
   const [users,    setUsers]    = useState([])
+  const [accounts, setAccounts] = useState([])
+  const [payouts,  setPayouts]  = useState([])
+  const [approvingId, setApprovingId] = useState(null)
 
   const loadData = async () => {
     try {
@@ -252,18 +365,54 @@ export default function AdminDashboard() {
     } catch { toast.error('Error cargando datos') }
   }
 
-  useEffect(() => { loadData() }, [])
+  const loadFinanzas = async () => {
+    try {
+      const [aRes, pRes] = await Promise.all([
+        api.get('/payouts/accounts/pending'),
+        api.get('/payouts'),
+      ])
+      setAccounts(aRes.data.data || [])
+      setPayouts(pRes.data.data || [])
+    } catch { toast.error('Error cargando datos de finanzas') }
+  }
+
+  useEffect(() => { isFinanzas ? loadFinanzas() : loadData() }, [isFinanzas])
 
   const handleLogout = async () => { await logout(); navigate('/welcome') }
+
+  const handleVerifyAccount = async (accountId) => {
+    try {
+      await api.post(`/payouts/accounts/${accountId}/verify`)
+      toast.success('Cuenta verificada')
+      loadFinanzas()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo verificar la cuenta')
+    }
+  }
+
+  const handleApprovePayout = async (payoutId) => {
+    setApprovingId(payoutId)
+    try {
+      await api.post(`/payouts/${payoutId}/approve`)
+      toast.success('Payout enviado')
+      loadFinanzas()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo aprobar el payout')
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   const VIEWS = {
     dashboard: <DashboardView projects={projects} quotes={quotes} workers={workers} users={users} />,
     users:     <UsersView     users={users} />,
+    finanzas:  <FinanzasView  accounts={accounts} payouts={payouts} approvingId={approvingId}
+                              onVerifyAccount={handleVerifyAccount} onApprovePayout={handleApprovePayout} />,
   }
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-outfit">
-      <Sidebar active={active} setActive={setActive} user={user} onLogout={handleLogout} />
+      <Sidebar nav={nav} active={active} setActive={setActive} user={user} onLogout={handleLogout} />
       <main className="flex-1 p-8 overflow-y-auto">{VIEWS[active]}</main>
     </div>
   )

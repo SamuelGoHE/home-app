@@ -1,5 +1,5 @@
 jest.mock('../src/models', () => ({
-  WorkerPayoutAccount: { findOrCreate: jest.fn() },
+  WorkerPayoutAccount: { findOrCreate: jest.fn(), findAll: jest.fn(), findByPk: jest.fn() },
 }));
 
 const svc = require('../src/services/payoutAccountService');
@@ -49,5 +49,25 @@ describe('payoutAccountService.registerAccount', () => {
     await svc.registerAccount('w1', validData);
 
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ verified: false }));
+  });
+});
+
+describe('payoutAccountService.verifyAccount', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rejects an account that does not exist', async () => {
+    WorkerPayoutAccount.findByPk.mockResolvedValue(null);
+    await expect(
+      svc.verifyAccount('acc1', { id: 'af1' })
+    ).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test('marks the account verified and records who approved it', async () => {
+    const update = jest.fn().mockResolvedValue();
+    WorkerPayoutAccount.findByPk.mockResolvedValue({ id: 'acc1', update });
+
+    await svc.verifyAccount('acc1', { id: 'af1' });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ verified: true, verified_by: 'af1' }));
   });
 });

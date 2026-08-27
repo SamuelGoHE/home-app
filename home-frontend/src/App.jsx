@@ -52,7 +52,7 @@ function loadFacebookSDK(appId) {
 function RoleRedirect() {
   const { user, isAuthenticated } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/welcome" replace />
-  if (user?.role === 'admin') return <Navigate to="/admin" replace />
+  if (user?.role === 'admin' || user?.role === 'admin_finanzas') return <Navigate to="/admin" replace />
   if (user?.role === 'trabajador') return <Navigate to="/worker" replace />
   return <HomeScreen />
 }
@@ -105,7 +105,7 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={['admin', 'admin_finanzas']} />}>
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 

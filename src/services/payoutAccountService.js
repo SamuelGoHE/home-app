@@ -4,9 +4,11 @@ const ACCOUNT_TYPES = ['ahorros', 'corriente'];
 
 /**
  * Registra (o reemplaza) la cuenta de payout del trabajador autenticado.
- * No se llama a Wompi todavía — el registro del destinatario ante Wompi
- * (wompi_recipient_id) ocurre cuando admin_finanzas la verifica, no aquí
- * (ver payoutService, siguiente fase).
+ * No se llama a Wompi todavía — el registro del destinatario ante su API de
+ * Payouts (wompi_recipient_id) está pendiente de implementar (ver
+ * payoutService.sendWompiPayout: su referencia de API no es accesible sin
+ * sesión iniciada en docs.wompi.co, así que por ahora esto solo maneja el
+ * estado interno de verificación de admin_finanzas).
  */
 const registerAccount = async (workerId, data) => {
   const { bank_name, account_type, account_number, account_holder_id_number } = data;
@@ -50,4 +52,20 @@ const getAccount = async (workerId) => {
   return WorkerPayoutAccount.findOne({ where: { worker_id: workerId } });
 };
 
-module.exports = { registerAccount, getAccount, ACCOUNT_TYPES };
+// admin_finanzas: cuentas todavía sin revisar.
+const listUnverifiedAccounts = async () => {
+  return WorkerPayoutAccount.findAll({
+    where: { verified: false },
+    include: [{ association: 'worker', attributes: ['id', 'name', 'email', 'phone'] }],
+    order: [['created_at', 'ASC']],
+  });
+};
+
+const verifyAccount = async (accountId, adminUser) => {
+  const account = await WorkerPayoutAccount.findByPk(accountId);
+  if (!account) { const e = new Error('Cuenta no encontrada'); e.statusCode = 404; throw e; }
+  await account.update({ verified: true, verified_by: adminUser.id, verified_at: new Date() });
+  return account;
+};
+
+module.exports = { registerAccount, getAccount, listUnverifiedAccounts, verifyAccount, ACCOUNT_TYPES };
