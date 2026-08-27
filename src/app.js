@@ -16,6 +16,7 @@ const quotesRoutes = require('./routes/quotes');
 const tasksRoutes = require('./routes/tasks');
 const usersRoutes = require('./routes/users');
 const messagesRoutes = require('./routes/messages');
+const paymentsRoutes = require('./routes/payments');
 const { errorHandler, notFound } = require('./middlewares/errorHandler');
 
 const app = express();
@@ -56,6 +57,7 @@ app.use('/api', projectRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/payments', paymentsRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

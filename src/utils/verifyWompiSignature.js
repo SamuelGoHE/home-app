@@ -21,7 +21,7 @@ const verifyWompiSignature = (payload) => {
   if (!signature?.properties || !signature?.checksum || !timestamp || !data) return false;
 
   const concatenated = signature.properties
-    .map((path) => path.split('.').reduce((obj, key) => obj?.[key], { data }))
+    .map((path) => path.split('.').reduce((obj, key) => obj?.[key], data))
     .join('');
 
   const expected = crypto

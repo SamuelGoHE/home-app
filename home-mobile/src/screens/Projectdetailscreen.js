@@ -6,11 +6,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import {
-    MapPin, MessageCircle, Star, Check, Camera, X, Calendar,
+    MapPin, MessageCircle, Star, Check, Camera, X, Calendar, Wallet,
 } from 'lucide-react-native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useProject, useProjectPhotos } from '../hooks/useApi';
+import { useProject, useProjectPhotos, usePayments } from '../hooks/useApi';
 import { useAuthStore } from '../context/authStore';
 import api from '../services/api';
 import { getStatus } from '../design-system/status.js';
@@ -49,6 +49,10 @@ const ICON = {
 // amber está atado al concepto de "rating/estrellas", no a un estado de
 // proyecto (mismo criterio ya aplicado en WorkerProfileScreen.jsx, web).
 const RATING_COLOR = '#f59e0b';
+
+// Debe coincidir con PRE_PROGRESS_STATUSES en src/services/paymentService.js
+// (backend) — estados en los que el proyecto todavía no arrancó ni terminó.
+const PRE_PROGRESS_STATUSES = ['pendiente', 'en_revision', 'aprobado', 'pausado'];
 
 /**
  * Prioridad de tarea — mapa LOCAL de esta pantalla, deliberadamente
@@ -89,6 +93,7 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const { user } = useAuthStore();
     const { data: project, loading, error, refetch } = useProject(id);
     const { data: photos, loading: loadingPhotos, error: errorPhotos, refetch: refetchPhotos } = useProjectPhotos(id);
+    const { data: payments } = usePayments(id);
     const [updating, setUpdating] = useState(false);
     const [photoStage, setPhotoStage] = useState('antes');
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -111,13 +116,18 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const isCompleted = project?.status === 'completado';
     const myRating = (project?.ratings || []).find(r => r.reviewer_id === user?.id);
 
+    /* ── Pago inicial (20%) — arrancar el proyecto ya no es una transición
+       manual, requiere que el cliente pague. Ver paymentService.js. ── */
+    const initialPayment = (payments || []).find(p => p.type === 'inicial');
+    const needsInitialPayment = project
+        && PRE_PROGRESS_STATUSES.includes(project.status)
+        && initialPayment?.status !== 'aprobado';
+
     /* ── Worker action button ── */
     const workerAction = () => {
         if (user?.role !== 'trabajador' || !project) return null;
         if (project.status === 'pendiente')
             return { label: 'Comenzar trabajo', status: 'en_revision' };
-        if (['en_revision', 'aprobado', 'pausado'].includes(project.status))
-            return { label: 'Continuar progreso', status: 'en_progreso' };
         if (project.status === 'en_progreso')
             return { label: 'Marcar como completado', status: 'completado' };
         return null;
@@ -284,6 +294,32 @@ export default function ProjectDetailScreen({ route, navigation }) {
                         </View>
                     )}
                 </Card>
+
+                {/* ── Pago inicial pendiente ── */}
+                {needsInitialPayment && user?.role === 'cliente' && (
+                    <Button
+                        variant="primary"
+                        fullWidth
+                        accessibilityHint="Abre el pago del 20% inicial para arrancar el proyecto"
+                        onPress={() => navigation.navigate('Payment', {
+                            projectId: project.id,
+                            projectTitle: project.title,
+                            amount: Number(project.budget || 0) * 0.20,
+                        })}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <Wallet size={16} color={ICON.surface} />
+                            <Text className="text-white font-extrabold text-[14px]">Pagar inicial y arrancar</Text>
+                        </View>
+                    </Button>
+                )}
+                {needsInitialPayment && user?.role === 'trabajador' && (
+                    <Card padding="sm" className="!bg-amber-50 !border-amber-100">
+                        <Text className="text-[13px] font-bold text-amber-700 text-center">
+                            Esperando que el cliente pague el inicial para arrancar el proyecto.
+                        </Text>
+                    </Card>
+                )}
 
                 {/* ── Worker action ── */}
                 {action && (

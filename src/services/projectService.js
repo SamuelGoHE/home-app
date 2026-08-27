@@ -82,16 +82,19 @@ const updateProjectStatus = async (id, status, user) => {
     if (project.worker_id !== user.id) {
       const e = new Error('No tienes permiso para modificar este proyecto'); e.statusCode = 403; throw e;
     }
-    const allowed = ['en_revision', 'en_progreso', 'completado'];
+    // 'en_progreso' ya no es una transición manual: solo ocurre cuando Wompi
+    // confirma el pago inicial (ver paymentService.handleWompiWebhook).
+    const allowed = ['en_revision', 'completado'];
     if (!allowed.includes(status)) {
-      const e = new Error('Como trabajador solo puedes enviar a revisión o retomar el progreso'); e.statusCode = 400; throw e;
+      const e = new Error('Como trabajador solo puedes enviar a revisión o completar el proyecto'); e.statusCode = 400; throw e;
     }
   } else if (user.role === 'cliente') {
     if (project.client_id !== user.id) {
       const e = new Error('No tienes permiso para modificar este proyecto'); e.statusCode = 403; throw e;
     }
-    // Cliente puede aprobar o completar el proyecto
-    const allowed = ['aprobado', 'completado', 'cancelado', 'en_progreso'];
+    // Cliente puede aprobar o completar el proyecto. 'en_progreso' ya no es
+    // manual — requiere pagar el 20% inicial (ver paymentService).
+    const allowed = ['aprobado', 'completado', 'cancelado'];
     if (!allowed.includes(status)) {
       const e = new Error('Estado no permitido para el cliente'); e.statusCode = 400; throw e;
     }

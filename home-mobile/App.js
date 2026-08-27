@@ -44,6 +44,7 @@ import CalendarScreen from './src/screens/Calendarscreen';
 import ChatScreen from './src/screens/Chatscreen';
 import ChatsListScreen from './src/screens/Chatslistscreen';
 import RatingScreen from './src/screens/Ratingscreen';
+import PaymentScreen from './src/screens/PaymentScreen';
 import SecurityScreen from './src/screens/Securityscreen';
 
 // ── Instancias de navegadores (una por stack, nunca compartidas) ──
@@ -106,6 +107,7 @@ function ProjectsTabStack() {
       <ProjStack.Screen name="ProjectDetail"     component={ProjectDetailScreen} />
       <ProjStack.Screen name="Chat"              component={ChatScreen} />
       <ProjStack.Screen name="Rating"            component={RatingScreen} />
+      <ProjStack.Screen name="Payment"           component={PaymentScreen} />
     </ProjStack.Navigator>
   );
 }

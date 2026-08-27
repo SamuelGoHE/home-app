@@ -70,6 +70,11 @@ export function useProjectPhotos(projectId) {
   return { ...result, data: Array.isArray(result.data) ? result.data : null }
 }
 
+export function usePayments(projectId) {
+  const result = useFetch(projectId ? `/payments/${projectId}` : null, {}, [projectId])
+  return { ...result, data: Array.isArray(result.data) ? result.data : null }
+}
+
 export function useConversations() {
   const result = useFetch('/messages/conversations')
   return { ...result, data: Array.isArray(result.data) ? result.data : null }
