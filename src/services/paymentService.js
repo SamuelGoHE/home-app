@@ -1,10 +1,12 @@
 const { randomUUID } = require('crypto');
-const { Payment, Project, Task } = require('../models');
+const { Payment, Project, Task, Payout } = require('../models');
 const { wompi } = require('../config/wompi');
 const { verifyWompiSignature } = require('../utils/verifyWompiSignature');
 const { redisClient } = require('../config/redis');
 
 const INITIAL_COMMISSION_RATE = 0.20;
+const FINAL_RATE = 0.80;
+const PAYOUT_WAIT_HOURS = Number(process.env.PAYOUT_WAIT_HOURS) || 60;
 
 // Estados previos a que arranque el trabajo facturable. 'en_revision' y
 // 'aprobado' son pasos de reconocimiento entre cliente/trabajador anteriores
@@ -91,6 +93,53 @@ const createInitialPayment = async (projectId, user) => {
   return { paymentId: payment.id, url };
 };
 
+/**
+ * Crea el cobro final (80% de project.budget) al cliente, una vez el
+ * proyecto está 'completado'. Siempre es manual — el cliente lo paga con un
+ * nuevo Payment Link, sin importar con qué método pagó el 20% inicial (no
+ * se implementa cobro automático con tarjeta guardada: Wompi no soporta
+ * reutilizar la tarjeta de un Payment Link, solo de su API de transacciones
+ * cruda + Fuentes de pago — decisión tomada 2026-08-27 para no tener que
+ * meter un formulario de tarjeta dentro de la app).
+ */
+const createFinalPayment = async (projectId, user) => {
+  const project = await Project.findByPk(projectId);
+  assertClientOwnsProject(project, user);
+
+  if (project.status !== 'completado') {
+    const e = new Error('El pago final solo aplica cuando el proyecto está completado'); e.statusCode = 400; throw e;
+  }
+  if (!project.budget) {
+    const e = new Error('Este proyecto todavía no tiene un precio acordado'); e.statusCode = 400; throw e;
+  }
+
+  const existingApproved = await Payment.findOne({ where: { project_id: projectId, type: 'final', status: 'aprobado' } });
+  if (existingApproved) {
+    const e = new Error('El pago final de este proyecto ya fue confirmado'); e.statusCode = 409; throw e;
+  }
+
+  const amount = Number(project.budget) * FINAL_RATE;
+  const reference = `home-final-${projectId}-${randomUUID()}`;
+
+  const url = await createPaymentLink({
+    reference,
+    amountInCents: toCents(amount),
+    name: `HOME · Pago final (80%)`,
+    description: `Pago final para el proyecto "${project.title}"`,
+  });
+
+  const payment = await Payment.create({
+    type: 'final',
+    amount,
+    wompi_reference: reference,
+    status: 'pendiente',
+    project_id: projectId,
+    client_id: user.id,
+  });
+
+  return { paymentId: payment.id, url };
+};
+
 const getPaymentStatus = async (projectId, user) => {
   const project = await Project.findByPk(projectId);
   if (!project) { const e = new Error('Proyecto no encontrado'); e.statusCode = 404; throw e; }
@@ -153,9 +202,31 @@ const handleWompiWebhook = async (payload, io) => {
     }
   }
 
+  if (newStatus === 'aprobado' && payment.type === 'final') {
+    const project = await Project.findByPk(payment.project_id);
+    if (project?.worker_id) {
+      const existingPayout = await Payout.findOne({ where: { project_id: project.id } });
+      if (!existingPayout) {
+        await Payout.create({
+          amount: payment.amount,
+          eligible_at: new Date(Date.now() + PAYOUT_WAIT_HOURS * 60 * 60 * 1000),
+          project_id: project.id,
+          worker_id: project.worker_id,
+        });
+      }
+      if (io) {
+        io.to(`user:${project.client_id}`).emit('payment_confirmed', { projectId: project.id, type: 'final' });
+        io.to(`user:${project.worker_id}`).emit('payout_pending', { projectId: project.id });
+      }
+    }
+  }
+
   try {
     await redisClient.setEx(idempotencyKey, 60 * 60 * 24, '1');
   } catch { /* Redis caído, no pasa nada — solo perdemos la dedupe */ }
 };
 
-module.exports = { createInitialPayment, getPaymentStatus, handleWompiWebhook, INITIAL_COMMISSION_RATE };
+module.exports = {
+  createInitialPayment, createFinalPayment, getPaymentStatus, handleWompiWebhook,
+  INITIAL_COMMISSION_RATE, FINAL_RATE,
+};

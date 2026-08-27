@@ -45,6 +45,7 @@ import ChatScreen from './src/screens/Chatscreen';
 import ChatsListScreen from './src/screens/Chatslistscreen';
 import RatingScreen from './src/screens/Ratingscreen';
 import PaymentScreen from './src/screens/PaymentScreen';
+import BankAccountScreen from './src/screens/BankAccountScreen';
 import SecurityScreen from './src/screens/Securityscreen';
 
 // ── Instancias de navegadores (una por stack, nunca compartidas) ──
@@ -154,6 +155,7 @@ function WorkerProfileTabStack() {
       <WkrProfStack.Screen name="Help"             component={HelpCenterScreen} />
       <WkrProfStack.Screen name="AppSettings"      component={AppSettingsScreen} />
       <WkrProfStack.Screen name="Security"         component={SecurityScreen} />
+      <WkrProfStack.Screen name="BankAccount"      component={BankAccountScreen} />
     </WkrProfStack.Navigator>
   );
 }

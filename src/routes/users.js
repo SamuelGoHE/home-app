@@ -7,6 +7,7 @@ const { revokeAllRefreshTokens, blacklistAccessToken } = require('../utils/jwt')
 const { singlePhoto } = require('../middlewares/upload');
 const { uploadAvatar } = require('../utils/storage');
 const portfolioService = require('../services/workerPortfolioService');
+const payoutAccountService = require('../services/payoutAccountService');
 const router = express.Router();
 
 // Obtener un usuario por email (solo admin)
@@ -272,6 +273,26 @@ router.delete('/me/portfolio/:photoId', authenticate, async (req, res, next) => 
   try {
     await portfolioService.deletePhoto(req.params.photoId, req.user);
     res.json({ success: true, message: 'Foto eliminada de tu portafolio' });
+  } catch (error) {
+    if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
+    next(error);
+  }
+});
+
+// ── GET /users/me/payout-account — ver el estado de la cuenta de cobro propia ──
+router.get('/me/payout-account', authenticate, authorize('trabajador'), async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await payoutAccountService.getAccount(req.user.id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── POST /users/me/payout-account — registrar o corregir la cuenta de cobro ──
+router.post('/me/payout-account', authenticate, authorize('trabajador'), async (req, res, next) => {
+  try {
+    const account = await payoutAccountService.registerAccount(req.user.id, req.body);
+    res.status(201).json({ success: true, message: 'Cuenta bancaria registrada, queda pendiente de verificación', data: account });
   } catch (error) {
     if (error.statusCode) return res.status(error.statusCode).json({ success: false, message: error.message });
     next(error);

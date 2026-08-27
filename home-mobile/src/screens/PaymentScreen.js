@@ -14,23 +14,39 @@ const ICON = {
 const formatCOP = (n) =>
     new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n);
 
+const COPY = {
+    inicial: {
+        title: 'Pago inicial',
+        label: 'Monto a pagar (20%)',
+        note: 'Este pago inicia el proyecto. El 80% restante se cobra cuando el trabajo quede completado. HOME procesa los pagos a través de Wompi.',
+        confirmed: 'Pago confirmado — el proyecto ya está en progreso.',
+    },
+    final: {
+        title: 'Pago final',
+        label: 'Monto a pagar (80%)',
+        note: 'Este es el pago final del proyecto — se libera al trabajador después de la ventana de revisión. HOME procesa los pagos a través de Wompi.',
+        confirmed: 'Pago confirmado — gracias por completar el pago del proyecto.',
+    },
+};
+
 /**
- * Pantalla de "pagar ahora". Hoy solo cubre el pago inicial (20%) — el pago
- * final (80%) reutilizará esta misma pantalla cuando exista (ver
- * paymentService en el backend, fase siguiente del roadmap de pagos).
+ * Pantalla de "pagar ahora", compartida entre el pago inicial (20%) y el
+ * pago final (80%) — mismo mecanismo (Payment Link de Wompi abierto en el
+ * navegador in-app), solo cambia el tipo y a qué endpoint se llama.
  */
 export default function PaymentScreen({ route, navigation }) {
-    const { projectId, projectTitle, amount } = route.params || {};
+    const { projectId, projectTitle, amount, type = 'inicial' } = route.params || {};
+    const copy = COPY[type] || COPY.inicial;
     const { data: payments, loading, error, refetch } = usePayments(projectId);
     const [paying, setPaying] = useState(false);
 
-    const initialPayment = (payments || []).find(p => p.type === 'inicial');
-    const alreadyApproved = initialPayment?.status === 'aprobado';
+    const payment = (payments || []).find(p => p.type === type);
+    const alreadyApproved = payment?.status === 'aprobado';
 
     const handlePay = async () => {
         setPaying(true);
         try {
-            const res = await api.post(`/payments/${projectId}/initial`);
+            const res = await api.post(`/payments/${projectId}/${type}`);
             const { url } = res.data.data;
             await WebBrowser.openBrowserAsync(url);
             // Al volver del navegador, refrescamos por si el webhook ya confirmó.
@@ -63,7 +79,7 @@ export default function PaymentScreen({ route, navigation }) {
             <View className="bg-surface border-b border-border px-5 pt-2 pb-3 flex-row items-center gap-3">
                 <BackButton onPress={() => navigation.goBack()} />
                 <Text className="text-[16px] font-extrabold text-ink flex-1" numberOfLines={1}>
-                    Pago inicial
+                    {copy.title}
                 </Text>
             </View>
 
@@ -74,16 +90,15 @@ export default function PaymentScreen({ route, navigation }) {
                         {projectTitle || 'Proyecto'}
                     </Text>
 
-                    <Text className="text-[13px] font-bold text-muted mb-1">Monto a pagar (20%)</Text>
+                    <Text className="text-[13px] font-bold text-muted mb-1">{copy.label}</Text>
                     <Text className="text-[28px] font-extrabold text-brand mb-4">
-                        {formatCOP(amount || initialPayment?.amount || 0)}
+                        {formatCOP(amount || payment?.amount || 0)}
                     </Text>
 
                     <View className="flex-row items-start gap-2 bg-gray-50 rounded-xl p-3">
                         <ShieldCheck size={16} color={ICON.brand} style={{ marginTop: 1 }} />
                         <Text className="text-[12px] text-muted flex-1 leading-relaxed">
-                            Este pago inicia el proyecto. El 80% restante se cobra cuando el trabajo quede
-                            completado. HOME procesa los pagos a través de Wompi.
+                            {copy.note}
                         </Text>
                     </View>
                 </Card>
@@ -91,7 +106,7 @@ export default function PaymentScreen({ route, navigation }) {
                 {alreadyApproved ? (
                     <Card padding="sm" className="!bg-success/10 !border-success/20">
                         <Text className="text-[14px] font-extrabold text-success text-center">
-                            Pago confirmado — el proyecto ya está en progreso.
+                            {copy.confirmed}
                         </Text>
                     </Card>
                 ) : (
@@ -100,7 +115,7 @@ export default function PaymentScreen({ route, navigation }) {
                     </Button>
                 )}
 
-                {initialPayment?.status === 'pendiente' && !alreadyApproved && (
+                {payment?.status === 'pendiente' && !alreadyApproved && (
                     <Button variant="ghost" fullWidth onPress={refetch}>
                         Ya pagué, verificar estado
                     </Button>

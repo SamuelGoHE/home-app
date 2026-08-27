@@ -123,6 +123,10 @@ export default function ProjectDetailScreen({ route, navigation }) {
         && PRE_PROGRESS_STATUSES.includes(project.status)
         && initialPayment?.status !== 'aprobado';
 
+    /* ── Pago final (80%) — siempre manual, se habilita al completar. ── */
+    const finalPayment = (payments || []).find(p => p.type === 'final');
+    const needsFinalPayment = project?.status === 'completado' && finalPayment?.status !== 'aprobado';
+
     /* ── Worker action button ── */
     const workerAction = () => {
         if (user?.role !== 'trabajador' || !project) return null;
@@ -317,6 +321,33 @@ export default function ProjectDetailScreen({ route, navigation }) {
                     <Card padding="sm" className="!bg-amber-50 !border-amber-100">
                         <Text className="text-[13px] font-bold text-amber-700 text-center">
                             Esperando que el cliente pague el inicial para arrancar el proyecto.
+                        </Text>
+                    </Card>
+                )}
+
+                {/* ── Pago final pendiente ── */}
+                {needsFinalPayment && user?.role === 'cliente' && (
+                    <Button
+                        variant="primary"
+                        fullWidth
+                        accessibilityHint="Abre el pago del 80% final del proyecto"
+                        onPress={() => navigation.navigate('Payment', {
+                            projectId: project.id,
+                            projectTitle: project.title,
+                            amount: Number(project.budget || 0) * 0.80,
+                            type: 'final',
+                        })}
+                    >
+                        <View className="flex-row items-center gap-2">
+                            <Wallet size={16} color={ICON.surface} />
+                            <Text className="text-white font-extrabold text-[14px]">Pagar final (80%)</Text>
+                        </View>
+                    </Button>
+                )}
+                {needsFinalPayment && user?.role === 'trabajador' && (
+                    <Card padding="sm" className="!bg-amber-50 !border-amber-100">
+                        <Text className="text-[13px] font-bold text-amber-700 text-center">
+                            Esperando que el cliente pague el final para liberar tu pago.
                         </Text>
                     </Card>
                 )}

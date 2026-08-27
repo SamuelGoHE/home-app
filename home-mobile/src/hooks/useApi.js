@@ -75,6 +75,11 @@ export function usePayments(projectId) {
   return { ...result, data: Array.isArray(result.data) ? result.data : null }
 }
 
+export function usePayoutAccount() {
+  const result = useFetch('/users/me/payout-account')
+  return { ...result, data: result.data ?? null }
+}
+
 export function useConversations() {
   const result = useFetch('/messages/conversations')
   return { ...result, data: Array.isArray(result.data) ? result.data : null }

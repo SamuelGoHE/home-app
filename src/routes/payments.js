@@ -12,6 +12,9 @@ router.use(authenticate);
 // POST /api/payments/:projectId/initial
 router.post('/:projectId/initial', authorize('cliente'), paymentController.createInitialPayment);
 
+// POST /api/payments/:projectId/final
+router.post('/:projectId/final', authorize('cliente'), paymentController.createFinalPayment);
+
 // GET /api/payments/:projectId
 router.get('/:projectId', paymentController.getPaymentStatus);
 

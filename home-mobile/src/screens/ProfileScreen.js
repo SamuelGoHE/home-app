@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   LogOut, ChevronRight, User, Star,
   FileText, Settings, HelpCircle, Shield, Bell,
-  Briefcase, TrendingUp,
+  Briefcase, TrendingUp, Wallet,
 } from 'lucide-react-native';
 import { useAuthStore } from '../context/authStore';
 import { useNotifications } from '../hooks/useNotifications';
@@ -54,6 +54,7 @@ const WORKER_MENU = [
     items: [
       { icon: User,    label: 'Mis datos personales',    screen: 'ProfileEdit',  params: { section: 'personal' }, iconColor: '#6366f1', bg: '#eef2ff' },
       { icon: Bell,    label: 'Notificaciones',          screen: null,           iconColor: '#f97316', bg: '#fff7ed', isNotif: true },
+      { icon: Wallet,  label: 'Cuenta bancaria',         screen: 'BankAccount',  iconColor: '#0ea5e9', bg: '#f0f9ff' },
       { icon: Shield,  label: 'Seguridad y privacidad',  screen: 'Security',     iconColor: '#10b981', bg: '#ecfdf5' },
     ],
   },

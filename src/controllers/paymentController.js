@@ -9,6 +9,15 @@ const createInitialPayment = async (req, res, next) => {
   }
 };
 
+const createFinalPayment = async (req, res, next) => {
+  try {
+    const result = await paymentService.createFinalPayment(req.params.projectId, req.user);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getPaymentStatus = async (req, res, next) => {
   try {
     const payments = await paymentService.getPaymentStatus(req.params.projectId, req.user);
@@ -29,4 +38,4 @@ const wompiWebhook = async (req, res) => {
   }
 };
 
-module.exports = { createInitialPayment, getPaymentStatus, wompiWebhook };
+module.exports = { createInitialPayment, createFinalPayment, getPaymentStatus, wompiWebhook };
