@@ -1,18 +1,18 @@
 const crypto = require('crypto');
-const { eventsSecret } = require('../config/wompi');
+const { eventsSecret: checkoutEventsSecret } = require('../config/wompi');
 
 /**
- * Verifica el checksum de un webhook de Wompi.
- *
- * IMPORTANTE: implementado según el esquema de checksum documentado por
- * Wompi al momento de escribir esto (SHA256 de los valores de
- * `signature.properties`, en el orden dado, más `timestamp` y el events
- * secret). Verificar contra la documentación vigente de Wompi antes de
- * activar esto en producción — su formato de eventos puede cambiar.
+ * Verifica el checksum de un webhook de Wompi (Checkout o Payouts — ambos
+ * usan exactamente el mismo esquema, confirmado contra su documentación
+ * oficial: SHA256 de los valores de `signature.properties` en el orden
+ * dado, más `timestamp`, más el events secret). Lo único que cambia entre
+ * productos es CUÁL secreto usar — Payouts tiene el suyo propio, separado
+ * del de Checkout (ver src/config/wompiPayouts.js) — por eso `secret` es
+ * un parámetro en vez de venir siempre del mismo config.
  */
-const verifyWompiSignature = (payload) => {
-  if (!eventsSecret) {
-    const e = new Error('WOMPI_EVENTS_SECRET no configurado');
+const verifyWompiSignature = (payload, secret = checkoutEventsSecret) => {
+  if (!secret) {
+    const e = new Error('Events secret no configurado');
     e.statusCode = 500;
     throw e;
   }
@@ -26,7 +26,7 @@ const verifyWompiSignature = (payload) => {
 
   const expected = crypto
     .createHash('sha256')
-    .update(`${concatenated}${timestamp}${eventsSecret}`)
+    .update(`${concatenated}${timestamp}${secret}`)
     .digest('hex');
 
   return expected.toLowerCase() === String(signature.checksum).toLowerCase();

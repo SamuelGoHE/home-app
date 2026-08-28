@@ -6,6 +6,7 @@ const WorkerPayoutAccount = sequelize.define('WorkerPayoutAccount', {
   bank_name:                 { type: DataTypes.STRING(100), allowNull: false },
   account_type:              { type: DataTypes.ENUM('ahorros', 'corriente'), allowNull: false },
   account_number_last4:      { type: DataTypes.STRING(4), allowNull: false },
+  account_number:            { type: DataTypes.STRING(30), allowNull: true },
   account_holder_id_number:  { type: DataTypes.STRING(30), allowNull: false },
   wompi_recipient_id:        { type: DataTypes.STRING, allowNull: true },
   verified:                  { type: DataTypes.BOOLEAN, defaultValue: false },

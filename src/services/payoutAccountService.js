@@ -4,11 +4,14 @@ const ACCOUNT_TYPES = ['ahorros', 'corriente'];
 
 /**
  * Registra (o reemplaza) la cuenta de payout del trabajador autenticado.
- * No se llama a Wompi todavía — el registro del destinatario ante su API de
- * Payouts (wompi_recipient_id) está pendiente de implementar (ver
- * payoutService.sendWompiPayout: su referencia de API no es accesible sin
- * sesión iniciada en docs.wompi.co, así que por ahora esto solo maneja el
- * estado interno de verificación de admin_finanzas).
+ *
+ * Guarda el número de cuenta completo, no solo los últimos 4 — corrección
+ * sobre el diseño original de la fase 1, que asumía que Wompi guardaría el
+ * número completo como "fuente de verdad" al registrar un destinatario. La
+ * API real de Payouts (POST /payouts, confirmada contra docs.wompi.co) no
+ * tiene ese registro previo: el número completo va en cada envío, así que
+ * tiene que persistirse acá. `account_number_last4` se mantiene solo para
+ * mostrarlo en UI sin exponer el número completo de entrada.
  */
 const registerAccount = async (workerId, data) => {
   const { bank_name, account_type, account_number, account_holder_id_number } = data;
@@ -28,6 +31,7 @@ const registerAccount = async (workerId, data) => {
       worker_id: workerId,
       bank_name,
       account_type,
+      account_number,
       account_number_last4: last4,
       account_holder_id_number,
     },
@@ -38,6 +42,7 @@ const registerAccount = async (workerId, data) => {
   await account.update({
     bank_name,
     account_type,
+    account_number,
     account_number_last4: last4,
     account_holder_id_number,
     verified: false,

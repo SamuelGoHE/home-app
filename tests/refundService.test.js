@@ -5,8 +5,15 @@ jest.mock('../src/models', () => ({
   User: {},
 }));
 
+jest.mock('../src/config/wompiPayouts', () => ({
+  wompiPayouts: { post: jest.fn() },
+  sourceAccountId: 'source-account-1',
+  getBankId: jest.fn(),
+}));
+
 const svc = require('../src/services/refundService');
 const { Refund } = require('../src/models');
+const { wompiPayouts, getBankId } = require('../src/config/wompiPayouts');
 
 describe('refundService.createRefundRequest', () => {
   beforeEach(() => jest.clearAllMocks());
@@ -75,33 +82,63 @@ describe('refundService.approveRefund', () => {
   });
 
   test('rejects a refund that was already processed', async () => {
-    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'enviado', payment: { amount: 20000 } });
+    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'enviado', payment: { amount: 20000 }, client: {} });
     await expect(
       svc.approveRefund('r1', { id: 'af1' }, 5000)
     ).rejects.toMatchObject({ statusCode: 409 });
   });
 
   test('rejects a missing or negative penalty amount', async () => {
-    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'pendiente', payment: { amount: 20000 } });
+    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'pendiente', payment: { amount: 20000 }, client: {} });
     await expect(
       svc.approveRefund('r1', { id: 'af1' }, -100)
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
   test('rejects a penalty larger than the amount actually paid', async () => {
-    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'pendiente', payment: { amount: 20000 } });
+    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'pendiente', payment: { amount: 20000 }, client: {} });
     await expect(
       svc.approveRefund('r1', { id: 'af1' }, 25000)
     ).rejects.toMatchObject({ statusCode: 400 });
   });
 
-  test('fails cleanly because sending to Wompi is not implemented yet, and leaves the refund pendiente', async () => {
+  test('sends the refund to Wompi for the amount paid minus the penalty', async () => {
     const update = jest.fn().mockResolvedValue();
-    Refund.findByPk.mockResolvedValue({ id: 'r1', status: 'pendiente', payment: { amount: 20000 }, update });
+    const reload = jest.fn().mockResolvedValue({ id: 'r1', status: 'enviado' });
+    Refund.findByPk.mockResolvedValue({
+      id: 'r1', status: 'pendiente', payment: { amount: 20000 },
+      client: { name: 'Client Test', email: 'c@test.com' },
+      bank_name: 'Bancolombia', account_type: 'ahorros', account_number: '999', account_holder_id_number: '111',
+      update, reload,
+    });
+    getBankId.mockResolvedValue('bank-uuid-1');
+    wompiPayouts.post.mockResolvedValue({ data: { data: { id: 'wompi-refund-1' } } });
+
+    await svc.approveRefund('r1', { id: 'af1' }, 5000);
+
+    expect(wompiPayouts.post).toHaveBeenCalledWith('/payouts', expect.objectContaining({
+      paymentType: 'OTHER',
+      transactions: [expect.objectContaining({ amount: 1_500_000, name: 'Client Test' })], // (20000-5000)*100
+    }), expect.any(Object));
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({
+      penalty_amount: 5000, refund_amount: 15000, status: 'enviado', wompi_payout_id: 'wompi-refund-1',
+    }));
+  });
+
+  test('leaves the refund pendiente (not fallido) when Wompi rejects the request', async () => {
+    const update = jest.fn().mockResolvedValue();
+    Refund.findByPk.mockResolvedValue({
+      id: 'r1', status: 'pendiente', payment: { amount: 20000 },
+      client: { name: 'Client Test', email: 'c@test.com' },
+      bank_name: 'Bancolombia', account_type: 'ahorros', account_number: '999', account_holder_id_number: '111',
+      update,
+    });
+    getBankId.mockResolvedValue('bank-uuid-1');
+    wompiPayouts.post.mockRejectedValue({ response: { status: 400 } });
 
     await expect(
       svc.approveRefund('r1', { id: 'af1' }, 5000)
-    ).rejects.toMatchObject({ statusCode: 501 });
+    ).rejects.toMatchObject({ statusCode: 502 });
     expect(update).not.toHaveBeenCalled();
   });
 });

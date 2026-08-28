@@ -1,4 +1,7 @@
 const { Refund, Payment, Project, User } = require('../models');
+const { wompiPayouts, sourceAccountId, getBankId } = require('../config/wompiPayouts');
+
+const toCents = (amount) => Math.round(Number(amount) * 100);
 
 const ACCOUNT_TYPES = ['ahorros', 'corriente'];
 
@@ -57,14 +60,44 @@ const listRefunds = async (user, status) => {
 
 /**
  * Envía el reembolso a la cuenta del cliente vía la API de Payouts de
- * Wompi — mismo riel técnico que payoutService.sendWompiPayout, misma
- * limitación: su referencia de API no es accesible sin sesión iniciada en
- * docs.wompi.co, así que queda sin implementar hasta confirmar esos datos.
+ * Wompi (POST /payouts) — mismo riel técnico y mismo endpoint que
+ * payoutService.sendWompiPayout, solo cambia paymentType ('OTHER' en vez de
+ * 'PROVIDERS', ya que esto es una devolución, no un pago por servicio).
  */
-const sendWompiRefund = async (/* { refund, amount } */) => {
-  const e = new Error('El envío de reembolsos a Wompi todavía no está implementado (pendiente de verificar su API de referencia)');
-  e.statusCode = 501;
-  throw e;
+const sendWompiRefund = async ({ refund, client, amount, reference }) => {
+  if (!wompiPayouts) { const e = new Error('Wompi Payouts no configurado'); e.statusCode = 500; throw e; }
+  if (!sourceAccountId) { const e = new Error('Falta configurar WOMPI_PAYOUTS_ACCOUNT_ID'); e.statusCode = 500; throw e; }
+
+  const bankId = await getBankId(refund.bank_name);
+
+  let data;
+  try {
+    ({ data } = await wompiPayouts.post('/payouts', {
+      reference,
+      accountId: sourceAccountId,
+      paymentType: 'OTHER',
+      transactions: [{
+        legalIdType: 'CC',
+        legalId: refund.account_holder_id_number,
+        bankId,
+        accountType: refund.account_type.toUpperCase(),
+        accountNumber: refund.account_number,
+        name: client.name,
+        email: client.email,
+        amount: toCents(amount),
+        reference,
+      }],
+    }, {
+      headers: { 'idempotency-key': require('crypto').randomUUID() },
+    }));
+  } catch (err) {
+    console.error('[Wompi Payouts] error creando reembolso:', err.response?.data || err.message);
+    const e = new Error('No se pudo enviar el reembolso a Wompi'); e.statusCode = 502; throw e;
+  }
+
+  const payoutId = data?.data?.id || data?.id;
+  if (!payoutId) { const e = new Error('Wompi no devolvió un id de payout válido'); e.statusCode = 502; throw e; }
+  return payoutId;
 };
 
 /**
@@ -72,7 +105,12 @@ const sendWompiRefund = async (/* { refund, amount } */) => {
  * (todavía no existe una fórmula, es criterio manual caso por caso).
  */
 const approveRefund = async (refundId, adminUser, penaltyAmount) => {
-  const refund = await Refund.findByPk(refundId, { include: [{ model: Payment, as: 'payment' }] });
+  const refund = await Refund.findByPk(refundId, {
+    include: [
+      { model: Payment, as: 'payment' },
+      { model: User, as: 'client', attributes: ['id', 'name', 'email'] },
+    ],
+  });
   if (!refund) { const e = new Error('Reembolso no encontrado'); e.statusCode = 404; throw e; }
   if (refund.status !== 'pendiente') {
     const e = new Error('Este reembolso ya fue procesado'); e.statusCode = 409; throw e;
@@ -89,10 +127,17 @@ const approveRefund = async (refundId, adminUser, penaltyAmount) => {
 
   const refundAmount = paidAmount - penalty;
 
-  // Sin try/catch a propósito, igual que payoutService.approvePayout: mientras
-  // sendWompiRefund no esté implementado, el error deja el reembolso intacto
-  // en 'pendiente' para reintentarlo, en vez de marcarlo 'fallido'.
-  const wompiPayoutId = await sendWompiRefund({ refund, amount: refundAmount });
+  // Sin try/catch a propósito, igual que payoutService.approvePayout: un
+  // rechazo síncrono del request (banco inválido, config faltante) deja el
+  // reembolso en 'pendiente' para reintentar tras corregirlo — un rechazo
+  // real ya en procesamiento llega después vía webhook (ver
+  // payoutService.handleWompiPayoutWebhook, que también resuelve refunds).
+  const wompiPayoutId = await sendWompiRefund({
+    refund,
+    client: refund.client,
+    amount: refundAmount,
+    reference: `home-refund-${refund.id}`,
+  });
 
   await refund.update({
     penalty_amount: penalty,
