@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
-const { Project, Task, Service, User, Quote, WorkerProfile, Rating } = require('../models');
+const { Project, Task, Service, User, Quote, WorkerProfile, Rating, Payment } = require('../models');
+const refundService = require('./refundService');
 
 // ── SERVICIOS ──────────────────────────────────────────────
 const getServices = async (category) => {
@@ -73,7 +74,7 @@ const createProject = async (data, adminId) => {
   return Project.create({ ...data, admin_id: adminId });
 };
 
-const updateProjectStatus = async (id, status, user) => {
+const updateProjectStatus = async (id, status, user, refundBankDetails) => {
   const project = await Project.findByPk(id);
   if (!project) { const e = new Error('Proyecto no encontrado'); e.statusCode = 404; throw e; }
 
@@ -100,6 +101,18 @@ const updateProjectStatus = async (id, status, user) => {
     }
   } else if (user.role !== 'admin') {
     const e = new Error('Solo personal autorizado puede cambiar el estado'); e.statusCode = 403; throw e;
+  }
+
+  // Cancelar con el pago inicial ya cobrado exige los datos bancarios de
+  // reembolso en el mismo request — no hay una cuenta de cliente guardada de
+  // antes (a diferencia de worker_payout_accounts), se captura ad-hoc acá.
+  if (status === 'cancelado') {
+    const approvedInitialPayment = await Payment.findOne({
+      where: { project_id: id, type: 'inicial', status: 'aprobado' },
+    });
+    if (approvedInitialPayment) {
+      await refundService.createRefundRequest(project, approvedInitialPayment, refundBankDetails);
+    }
   }
 
   const updates = { status };

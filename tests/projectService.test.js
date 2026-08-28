@@ -1,17 +1,23 @@
 jest.mock('../src/models', () => ({
   Project: { findByPk: jest.fn(), create: jest.fn() },
-  Task: { findByPk: jest.fn(), count: jest.fn(), create: jest.fn() },
+  Task: { findByPk: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
   Service: {},
   User: {},
   Quote: { findByPk: jest.fn() },
+  Payment: { findOne: jest.fn() },
 }));
 
 jest.mock('sequelize', () => ({
   Op: { in: Symbol('in'), ne: Symbol('ne'), iLike: Symbol('iLike') },
 }));
 
+jest.mock('../src/services/refundService', () => ({
+  createRefundRequest: jest.fn(),
+}));
+
 const svc = require('../src/services/projectService');
-const { Project, Task, Quote } = require('../src/models');
+const { Project, Task, Quote, Payment } = require('../src/models');
+const refundService = require('../src/services/refundService');
 
 describe('projectService permission checks', () => {
   beforeEach(() => {
@@ -117,5 +123,35 @@ describe('projectService permission checks', () => {
 
     expect(Project.create).toHaveBeenCalledWith(expect.objectContaining({ budget: 700000 }));
     expect(quoteUpdate).toHaveBeenCalledWith({ status: 'aceptada', project_id: 'project-2', agreed_price: 700000 });
+  });
+});
+
+describe('projectService.updateProjectStatus — cancelación y reembolsos', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('cancelling a project with no approved initial payment does not create a refund request', async () => {
+    const update = jest.fn().mockResolvedValue();
+    const reload = jest.fn().mockResolvedValue({ id: 'p1', status: 'cancelado' });
+    Project.findByPk.mockResolvedValue({ id: 'p1', client_id: 'c1', update, reload });
+    Payment.findOne.mockResolvedValue(null);
+
+    await svc.updateProjectStatus('p1', 'cancelado', { id: 'c1', role: 'cliente' });
+
+    expect(refundService.createRefundRequest).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledWith({ status: 'cancelado' });
+  });
+
+  test('cancelling a project with an approved initial payment creates a refund request with the bank details provided', async () => {
+    const update = jest.fn().mockResolvedValue();
+    const reload = jest.fn().mockResolvedValue({ id: 'p1', status: 'cancelado' });
+    const project = { id: 'p1', client_id: 'c1', update, reload };
+    Project.findByPk.mockResolvedValue(project);
+    const approvedPayment = { id: 'pay1', type: 'inicial', status: 'aprobado' };
+    Payment.findOne.mockResolvedValue(approvedPayment);
+    const bankDetails = { bank_name: 'Bancolombia', account_type: 'ahorros', account_number: '123', account_holder_id_number: '456' };
+
+    await svc.updateProjectStatus('p1', 'cancelado', { id: 'c1', role: 'cliente' }, bankDetails);
+
+    expect(refundService.createRefundRequest).toHaveBeenCalledWith(project, approvedPayment, bankDetails);
   });
 });

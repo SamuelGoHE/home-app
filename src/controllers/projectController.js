@@ -22,7 +22,7 @@ const createProject = async (req, res) => {
     res.status(201).json({ success: true, message: 'Proyecto creado', data: await svc.createProject(req.body, req.user.id) });
   } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); }
 };
-const updateStatus  = async (req, res) => { try { res.json({ success: true, data: await svc.updateProjectStatus(req.params.id, req.body.status, req.user) }); } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); } };
+const updateStatus  = async (req, res) => { try { res.json({ success: true, data: await svc.updateProjectStatus(req.params.id, req.body.status, req.user, req.body.refundBankDetails) }); } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); } };
 const deleteProject = async (req, res) => { try { await svc.deleteProject(req.params.id); res.json({ success: true, message: 'Proyecto eliminado' }); } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); } };
 
 // ── Tareas ─────────────────────────────────────────────────

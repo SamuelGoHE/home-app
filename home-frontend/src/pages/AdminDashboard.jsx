@@ -254,7 +254,39 @@ const PAYOUT_STATUS_CLASS = {
   fallido: 'bg-red-100 text-red-700',
 }
 
-function FinanzasView({ accounts, payouts, onVerifyAccount, onApprovePayout, approvingId }) {
+function RefundRow({ refund, onApprove, approving }) {
+  const [penalty, setPenalty] = useState('')
+  const paidAmount = Number(refund.payment?.amount || 0)
+  const penaltyNum = Number(penalty)
+  const canApprove = penalty !== '' && penaltyNum >= 0 && penaltyNum <= paidAmount
+
+  return (
+    <div className="flex items-center gap-3 px-5 py-3 border-b border-gray-50 last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-[13px] text-ink truncate">{refund.client?.name}</p>
+        <p className="text-[11px] text-gray-400 truncate">{refund.project?.title} · pagó {formatCOP(paidAmount)}</p>
+        <p className="text-[11px] text-gray-400 truncate">{refund.bank_name} · {refund.account_type} · cta. {refund.account_number}</p>
+      </div>
+      {refund.status === 'pendiente' ? (
+        <>
+          <input type="number" min="0" max={paidAmount} placeholder="Penalización"
+            value={penalty} onChange={e => setPenalty(e.target.value)}
+            className="w-28 px-2.5 py-1.5 rounded-lg border border-gray-200 text-[12px] text-right" />
+          <button onClick={() => onApprove(refund.id, penaltyNum)} disabled={!canApprove || approving}
+            className="flex-shrink-0 px-3 py-1.5 rounded-lg text-[12px] font-bold bg-brand/10 text-brand hover:bg-brand/20 transition-colors disabled:opacity-50">
+            {approving ? 'Enviando...' : 'Aprobar'}
+          </button>
+        </>
+      ) : (
+        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${PAYOUT_STATUS_CLASS[refund.status]}`}>
+          {PAYOUT_STATUS_LABEL[refund.status]}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function FinanzasView({ accounts, payouts, refunds, onVerifyAccount, onApprovePayout, onApproveRefund, approvingId }) {
   const [statusFilter, setStatusFilter] = useState('todos')
   const filteredPayouts = statusFilter === 'todos' ? payouts : payouts?.filter(p => p.status === statusFilter)
 
@@ -331,6 +363,19 @@ function FinanzasView({ accounts, payouts, onVerifyAccount, onApprovePayout, app
           )
         })}
       </div>
+
+      {/* Reembolsos */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm mt-6">
+        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+          <h2 className="font-bold text-[14px] text-ink uppercase tracking-wider">Reembolsos por cancelación</h2>
+          <p className="text-[11px] text-gray-400 mt-0.5">Define la penalización caso por caso — no hay fórmula todavía</p>
+        </div>
+        {(!refunds || refunds.length === 0) ? (
+          <div className="py-10 text-center text-gray-400 text-sm">No hay reembolsos pendientes</div>
+        ) : refunds.map(r => (
+          <RefundRow key={r.id} refund={r} onApprove={onApproveRefund} approving={approvingId === r.id} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -348,6 +393,7 @@ export default function AdminDashboard() {
   const [users,    setUsers]    = useState([])
   const [accounts, setAccounts] = useState([])
   const [payouts,  setPayouts]  = useState([])
+  const [refunds,  setRefunds]  = useState([])
   const [approvingId, setApprovingId] = useState(null)
 
   const loadData = async () => {
@@ -367,12 +413,14 @@ export default function AdminDashboard() {
 
   const loadFinanzas = async () => {
     try {
-      const [aRes, pRes] = await Promise.all([
+      const [aRes, pRes, rRes] = await Promise.all([
         api.get('/payouts/accounts/pending'),
         api.get('/payouts'),
+        api.get('/refunds'),
       ])
       setAccounts(aRes.data.data || [])
       setPayouts(pRes.data.data || [])
+      setRefunds(rRes.data.data || [])
     } catch { toast.error('Error cargando datos de finanzas') }
   }
 
@@ -403,11 +451,25 @@ export default function AdminDashboard() {
     }
   }
 
+  const handleApproveRefund = async (refundId, penaltyAmount) => {
+    setApprovingId(refundId)
+    try {
+      await api.post(`/refunds/${refundId}/approve`, { penaltyAmount })
+      toast.success('Reembolso enviado')
+      loadFinanzas()
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'No se pudo aprobar el reembolso')
+    } finally {
+      setApprovingId(null)
+    }
+  }
+
   const VIEWS = {
     dashboard: <DashboardView projects={projects} quotes={quotes} workers={workers} users={users} />,
     users:     <UsersView     users={users} />,
-    finanzas:  <FinanzasView  accounts={accounts} payouts={payouts} approvingId={approvingId}
-                              onVerifyAccount={handleVerifyAccount} onApprovePayout={handleApprovePayout} />,
+    finanzas:  <FinanzasView  accounts={accounts} payouts={payouts} refunds={refunds} approvingId={approvingId}
+                              onVerifyAccount={handleVerifyAccount} onApprovePayout={handleApprovePayout}
+                              onApproveRefund={handleApproveRefund} />,
   }
 
   return (

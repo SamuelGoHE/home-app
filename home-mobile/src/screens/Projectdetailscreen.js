@@ -16,7 +16,7 @@ import api from '../services/api';
 import { getStatus } from '../design-system/status.js';
 import {
     Button, IconButton, BackButton, Card, StatusBadge,
-    LoadingState, ErrorState, EmptyState,
+    LoadingState, ErrorState, EmptyState, Input,
 } from '../components/ui';
 
 /* ─── Etapas de las fotos del proyecto ──────────────────────────── */
@@ -98,6 +98,9 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const [photoStage, setPhotoStage] = useState('antes');
     const [uploadingPhoto, setUploadingPhoto] = useState(false);
     const [viewerPhoto, setViewerPhoto] = useState(null);
+    const [cancelling, setCancelling] = useState(false);
+    const [showCancelForm, setShowCancelForm] = useState(false);
+    const [refundBank, setRefundBank] = useState({ bank_name: '', account_type: 'ahorros', account_number: '', account_holder_id_number: '' });
 
     /* ── Derived state ── */
     const tasks = project?.tasks || [];
@@ -163,6 +166,42 @@ export default function ProjectDetailScreen({ route, navigation }) {
             ]
         );
     };
+
+    /* ── Cancelación (cliente) ── */
+    const canCancel = user?.role === 'cliente' && project && !['completado', 'cancelado'].includes(project.status);
+    const needsRefund = initialPayment?.status === 'aprobado';
+
+    const submitCancel = async (refundBankDetails) => {
+        setCancelling(true);
+        try {
+            await api.patch(`/projects/${id}/status`, { status: 'cancelado', refundBankDetails });
+            setShowCancelForm(false);
+            refetch();
+        } catch (err) {
+            Alert.alert('Error', err.response?.data?.message || 'No se pudo cancelar el proyecto. Intenta de nuevo.');
+        } finally {
+            setCancelling(false);
+        }
+    };
+
+    const handleCancelProject = () => {
+        if (needsRefund) {
+            // Ya se cobró el 20% inicial — se necesitan datos bancarios para el
+            // reembolso (no hay una cuenta de cliente guardada de antes).
+            setShowCancelForm(true);
+            return;
+        }
+        Alert.alert(
+            'Cancelar proyecto',
+            '¿Seguro que quieres cancelar este proyecto? No se ha cobrado ningún pago todavía.',
+            [
+                { text: 'No', style: 'cancel' },
+                { text: 'Sí, cancelar', style: 'destructive', onPress: () => submitCancel(null) },
+            ]
+        );
+    };
+
+    const canSubmitRefundForm = refundBank.bank_name.trim() && refundBank.account_number.trim() && refundBank.account_holder_id_number.trim();
 
     /* ── Fotos del proyecto ── */
     const canUploadPhotos = user?.role === 'trabajador' && project?.worker_id === user?.id;
@@ -628,6 +667,15 @@ export default function ProjectDetailScreen({ route, navigation }) {
                     )
                 )}
 
+                {/* ── Cancelar proyecto (cliente) ── */}
+                {canCancel && (
+                    <Button variant="ghost" fullWidth onPress={handleCancelProject} loading={cancelling}>
+                        <Text className="text-[13px] font-bold text-error">
+                            {cancelling ? 'Cancelando...' : 'Cancelar proyecto'}
+                        </Text>
+                    </Button>
+                )}
+
             </ScrollView>
 
             {/* ── Visor de foto a pantalla completa ── */}
@@ -653,6 +701,68 @@ export default function ProjectDetailScreen({ route, navigation }) {
                     {viewerPhoto?.caption && (
                         <Text className="text-white text-[13px] px-8 mt-4 text-center">{viewerPhoto.caption}</Text>
                     )}
+                </View>
+            </Modal>
+
+            {/* ── Cancelar con reembolso: pide cuenta bancaria antes de confirmar ── */}
+            <Modal visible={showCancelForm} transparent animationType="slide" onRequestClose={() => setShowCancelForm(false)}>
+                <View className="flex-1 bg-black/50 justify-end">
+                    <View className="bg-surface rounded-t-3xl p-5" style={{ gap: 12 }}>
+                        <View className="flex-row items-center justify-between mb-1">
+                            <Text className="text-[15px] font-extrabold text-ink">Cancelar y pedir reembolso</Text>
+                            <IconButton icon={X} variant="ghost" accessibilityLabel="Cerrar" onPress={() => setShowCancelForm(false)} />
+                        </View>
+                        <Text className="text-[12px] text-muted -mt-2 mb-1">
+                            Ya pagaste el inicial de este proyecto. Indica la cuenta a la que quieres que te devolvamos el
+                            saldo — HOME define una penalización caso por caso antes de aprobar el reembolso.
+                        </Text>
+
+                        <Input
+                            label="Banco"
+                            placeholder="Ej. Bancolombia"
+                            value={refundBank.bank_name}
+                            onChangeText={(v) => setRefundBank(f => ({ ...f, bank_name: v }))}
+                        />
+                        <View>
+                            <Text className="text-[12px] font-semibold text-ink mb-1.5">Tipo de cuenta</Text>
+                            <View className="flex-row gap-2">
+                                {[{ key: 'ahorros', label: 'Ahorros' }, { key: 'corriente', label: 'Corriente' }].map(t => (
+                                    <Button
+                                        key={t.key}
+                                        variant={refundBank.account_type === t.key ? 'primary' : 'secondary'}
+                                        size="sm"
+                                        className="flex-1"
+                                        onPress={() => setRefundBank(f => ({ ...f, account_type: t.key }))}
+                                    >
+                                        {t.label}
+                                    </Button>
+                                ))}
+                            </View>
+                        </View>
+                        <Input
+                            label="Número de cuenta"
+                            keyboardType="number-pad"
+                            value={refundBank.account_number}
+                            onChangeText={(v) => setRefundBank(f => ({ ...f, account_number: v.replace(/\D/g, '') }))}
+                        />
+                        <Input
+                            label="Cédula del titular"
+                            keyboardType="number-pad"
+                            value={refundBank.account_holder_id_number}
+                            onChangeText={(v) => setRefundBank(f => ({ ...f, account_holder_id_number: v.replace(/\D/g, '') }))}
+                        />
+
+                        <Button
+                            variant="primary"
+                            fullWidth
+                            loading={cancelling}
+                            disabled={!canSubmitRefundForm}
+                            className="!bg-error"
+                            onPress={() => submitCancel(refundBank)}
+                        >
+                            {cancelling ? 'Cancelando...' : 'Confirmar cancelación'}
+                        </Button>
+                    </View>
                 </View>
             </Modal>
         </SafeAreaView>
