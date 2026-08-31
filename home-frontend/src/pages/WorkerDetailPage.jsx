@@ -6,6 +6,9 @@ import toast from 'react-hot-toast'
 import { Button, IconButton, LoadingState } from '../components/ui'
 import { EmptyState } from '../components/common'
 
+const RATE_UNITS = { por_hora: 'por hora', por_dia: 'por día', por_m2: 'por m²', por_proyecto: 'por proyecto' }
+const formatCOP = value => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(value)
+
 const SERVICE_MAP = {
   pintura:            { label: 'Pintura Interior' },
   enchapes:           { label: 'Enchapes de Baño' },
@@ -60,6 +63,7 @@ export default function WorkerDetailPage() {
   }
 
   const profile = worker.workerProfile || {}
+  const selectedRate = worker.serviceRates?.find(rate => rate.specialty === serviceCategory)
   const stats = worker.stats || {}
 
   const avgRating  = stats.rating_avg  ? `${stats.rating_avg} ★` : '-- ★'
@@ -91,9 +95,9 @@ export default function WorkerDetailPage() {
       sq_meters: sqMeters,
       occupied,
       notes,
-      workerPricingModes: (profile.pricing_modes || []).join(','),
-      workerDailyRate: profile.daily_rate || '',
-      workerContractNote: profile.contract_pricing_note || '',
+      workerRateUnit: selectedRate?.price_unit || '',
+      workerRateAmount: selectedRate?.amount || '',
+      workerRateNote: selectedRate?.note || '',
     })
     navigate(`/calendar?${params.toString()}`)
   }
@@ -152,28 +156,16 @@ export default function WorkerDetailPage() {
         <h3 className="font-bold text-[15px] text-ink mb-2">Sobre mí</h3>
         <p className="text-sm text-gray-500 leading-relaxed">{profile.bio || 'Profesional dedicado y comprometido con la excelencia.'}</p>
 
-        {/* Cómo cobra este trabajador */}
-        {profile.pricing_modes?.length > 0 && (
+        {/* Precio específico para el servicio que escogió el cliente */}
+        {selectedRate && (
           <div className="mt-5 bg-gray-50 rounded-2xl p-4 border border-gray-100">
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">Cómo cobra</p>
-            <div className="flex flex-wrap gap-2">
-              {profile.pricing_modes.includes('por_dia') && (
-                <span className="flex items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5 text-[12px] font-bold text-ink">
-                  <CalendarDays size={13} className="text-brand" />
-                  Por día{profile.daily_rate ? ` · $${Number(profile.daily_rate).toLocaleString('es-CO')}` : ''}
-                </span>
-              )}
-              {profile.pricing_modes.includes('por_contrato') && (
-                <span className="flex items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5 text-[12px] font-bold text-ink">
-                  <FileSignature size={13} className="text-brand" />
-                  Por contrato
-                </span>
-              )}
-            </div>
-            {profile.pricing_modes.includes('por_contrato') && profile.contract_pricing_note && (
-              <p className="text-[12px] text-gray-500 mt-2 leading-relaxed">{profile.contract_pricing_note}</p>
+            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-1">Precio para este servicio</p>
+            {selectedRate.price_unit === 'a_convenir' ? (
+              <p className="text-[14px] font-bold text-ink">Cotización después de revisar el trabajo</p>
+            ) : (
+              <p className="text-[21px] font-black text-ink">{formatCOP(selectedRate.amount)} <span className="text-[13px] text-gray-500">{RATE_UNITS[selectedRate.price_unit]}</span></p>
             )}
-            <p className="text-[11px] text-gray-400 mt-2">Precio fijo del trabajador — sin negociación.</p>
+            <p className="text-[12px] text-gray-500 mt-2">{selectedRate.includes_materials ? 'Incluye materiales.' : 'No incluye materiales.'}{selectedRate.note ? ` ${selectedRate.note}` : ''}</p>
           </div>
         )}
 

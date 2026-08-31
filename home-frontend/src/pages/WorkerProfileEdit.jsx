@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, User, Briefcase, CheckCircle2, Check, FileText, DollarSign, CalendarDays, FileSignature } from 'lucide-react'
+import { ArrowLeft, Briefcase, CheckCircle2, FileText, DollarSign } from 'lucide-react'
 import { useAuthStore } from '../context/authStore'
 import { useWorker } from '../hooks/useApi'
 import api from '../services/api'
@@ -14,18 +14,22 @@ import {
 } from 'lucide-react'
 
 const ALL_SERVICES = [
-  { key: 'pintura',            label: 'Pintura Interior',        icon: Palette },
-  { key: 'pintura_ext',        label: 'Pintura Exterior',        icon: PenTool },
+  { key: 'pintura',            label: 'Pintura',                 icon: Palette },
   { key: 'electricidad',       label: 'Instalaciones Eléctricas', icon: Zap },
-  { key: 'enchapes',           label: 'Enchapes de Baño',        icon: Layers },
+  { key: 'enchapes',           label: 'Enchapes',                icon: Layers },
   { key: 'plomeria',           label: 'Plomería General',        icon: Droplets },
   { key: 'impermeabilizacion', label: 'Impermeabilización',      icon: Waves },
   { key: 'obra_gris',          label: 'Obra Gris',               icon: Construction },
-  { key: 'carpinteria',        label: 'Carpintería en Madera',   icon: Hammer },
-  { key: 'remodelacion',       label: 'Remodelación',            icon: Home },
-  { key: 'techos',             label: 'Techos y Cielos',         icon: Layers },
-  { key: 'pisos',              label: 'Pisos',                   icon: Shovel },
+  { key: 'carpinteria',        label: 'Carpintería',             icon: Hammer },
   { key: 'otro',               label: 'Otro',                    icon: PencilRuler },
+]
+
+const RATE_UNITS = [
+  { key: 'por_proyecto', label: 'Por proyecto' },
+  { key: 'por_dia', label: 'Por día' },
+  { key: 'por_m2', label: 'Por m²' },
+  { key: 'por_hora', label: 'Por hora' },
+  { key: 'a_convenir', label: 'A convenir' },
 ]
 
 export default function WorkerProfileEdit() {
@@ -49,9 +53,9 @@ export default function WorkerProfileEdit() {
 
   const { data: workerData, loading: loadingData } = useWorker(user.id)
 
-  const [form, setForm] = useState({ bio: '', years_experience: '', daily_rate: '', contract_pricing_note: '' })
+  const [form, setForm] = useState({ bio: '', years_experience: '' })
   const [selectedServices, setSelectedServices] = useState(new Set())
-  const [pricingModes, setPricingModes] = useState(new Set())
+  const [serviceRates, setServiceRates] = useState({})
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -59,13 +63,16 @@ export default function WorkerProfileEdit() {
       setForm({
         bio: workerData.workerProfile.bio || '',
         years_experience: workerData.workerProfile.years_experience || '',
-        daily_rate: workerData.workerProfile.daily_rate || '',
-        contract_pricing_note: workerData.workerProfile.contract_pricing_note || '',
       })
       // Cargar especialidades guardadas previamente
       const saved = workerData.workerProfile.specialties || []
       setSelectedServices(new Set(saved))
-      setPricingModes(new Set(workerData.workerProfile.pricing_modes || []))
+      setServiceRates(Object.fromEntries((workerData.serviceRates || []).map(rate => [rate.specialty, {
+        price_unit: rate.price_unit,
+        amount: rate.amount || '',
+        includes_materials: !!rate.includes_materials,
+        note: rate.note || '',
+      }])))
     }
   }, [workerData])
 
@@ -74,18 +81,23 @@ export default function WorkerProfileEdit() {
   const toggleService = (key) => {
     setSelectedServices(prev => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
+    })
+    setServiceRates(prev => {
+      if (prev[key]) {
+        const { [key]: _removed, ...remaining } = prev
+        return remaining
+      }
+      return { ...prev, [key]: { price_unit: 'por_proyecto', amount: '', includes_materials: false, note: '' } }
     })
   }
 
-  const togglePricingMode = (mode) => {
-    setPricingModes(prev => {
-      const next = new Set(prev)
-      next.has(mode) ? next.delete(mode) : next.add(mode)
-      return next
-    })
-  }
+  const updateRate = (specialty, field, value) => setServiceRates(prev => ({
+    ...prev,
+    [specialty]: { ...prev[specialty], [field]: value },
+  }))
 
   const handleSubmit = async (e) => {
     if (e?.preventDefault) e.preventDefault()
@@ -93,16 +105,9 @@ export default function WorkerProfileEdit() {
       toast.error('Selecciona al menos un servicio')
       return
     }
-    if (pricingModes.size === 0) {
-      toast.error('Elige al menos una modalidad de cobro')
-      return
-    }
-    if (pricingModes.has('por_dia') && !form.daily_rate) {
-      toast.error('Indica tu tarifa por día')
-      return
-    }
-    if (pricingModes.has('por_contrato') && !form.contract_pricing_note.trim()) {
-      toast.error('Describe cómo cotizas tus contratos')
+    const rates = Array.from(selectedServices).map(specialty => ({ specialty, ...serviceRates[specialty] }))
+    if (rates.some(rate => rate.price_unit !== 'a_convenir' && (!rate.amount || Number(rate.amount) <= 0))) {
+      toast.error('Indica un precio válido para cada especialidad')
       return
     }
     setSaving(true)
@@ -114,11 +119,7 @@ export default function WorkerProfileEdit() {
         cities_covered: workerData?.workerProfile?.cities_covered?.length > 0
           ? workerData.workerProfile.cities_covered
           : [user.city],
-        pricing_modes: Array.from(pricingModes),
-        daily_rate: pricingModes.has('por_dia') && form.daily_rate ? parseFloat(form.daily_rate) : null,
-        contract_pricing_note: pricingModes.has('por_contrato') && form.contract_pricing_note
-          ? form.contract_pricing_note.trim()
-          : null,
+        service_rates: rates.map(rate => ({ ...rate, amount: rate.amount === '' ? null : Number(rate.amount) })),
       })
       toast.success('Perfil actualizado correctamente')
       navigate(-1)
@@ -207,69 +208,6 @@ export default function WorkerProfileEdit() {
               </div>
             </div>
 
-            {/* SECCIÓN: MODALIDAD DE COBRO */}
-            <div className="space-y-4">
-              <label className="text-[12px] font-black text-gray-300 uppercase tracking-widest px-1">Cómo cobras</label>
-              <p className="text-[12px] text-gray-400 px-1 -mt-2">Por día define un precio fijo. Por contrato no hay un número único — depende de m², materiales y alcance — así que describes cómo cotizas y defines el monto al aceptar cada solicitud.</p>
-
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { key: 'por_dia', label: 'Por día', icon: CalendarDays, hint: 'Precio fijo por jornada' },
-                  { key: 'por_contrato', label: 'Por contrato', icon: FileSignature, hint: 'Cotizas cada trabajo' },
-                ].map(({ key, label, icon: Icon, hint }) => {
-                  const selected = pricingModes.has(key)
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => togglePricingMode(key)}
-                      className={`flex flex-col items-start gap-2 p-4 rounded-[24px] border-2 text-left transition-all
-                        ${selected ? 'border-brand bg-orange-50' : 'border-gray-50 bg-gray-50/50'}`}
-                    >
-                      <Icon size={20} className={selected ? 'text-brand' : 'text-gray-300'} />
-                      <span className={`text-[13px] font-black ${selected ? 'text-brand' : 'text-gray-500'}`}>{label}</span>
-                      <span className="text-[10px] text-gray-400 leading-tight">{hint}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {pricingModes.has('por_dia') && (
-                <div className="bg-gray-50 rounded-[24px] p-6 flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center text-brand shadow-sm flex-shrink-0">
-                    <DollarSign size={20} />
-                  </div>
-                  <div className="flex-1">
-                    <input
-                      type="number"
-                      min="0"
-                      placeholder="Ej: 120000"
-                      value={form.daily_rate}
-                      onChange={set('daily_rate')}
-                      className="w-full bg-transparent border-none p-0 text-[18px] font-black text-ink outline-none placeholder:text-gray-200"
-                    />
-                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">Precio fijo por día ($)</p>
-                  </div>
-                </div>
-              )}
-
-              {pricingModes.has('por_contrato') && (
-                <div className="bg-gray-50 rounded-[24px] p-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <FileText size={16} className="text-brand" />
-                    <p className="text-[11px] text-gray-400 font-bold uppercase tracking-wider">¿Cómo cotizas tus contratos?</p>
-                  </div>
-                  <textarea
-                    rows={3}
-                    placeholder="Ej: Cotizo según m² y materiales, te confirmo el precio después de revisar el trabajo"
-                    value={form.contract_pricing_note}
-                    onChange={set('contract_pricing_note')}
-                    className="w-full bg-white border-none rounded-2xl p-4 text-[14px] font-medium text-ink outline-none focus:ring-2 focus:ring-brand/10 transition-all resize-none placeholder:text-gray-300"
-                  />
-                </div>
-              )}
-            </div>
-
             {/* SECCIÓN: SERVICIOS */}
             <div className="space-y-4">
               <div className="flex items-center justify-between px-1">
@@ -307,8 +245,44 @@ export default function WorkerProfileEdit() {
             </div>
             
             <p className="text-[11px] text-gray-400 mt-2 px-1 font-medium leading-relaxed">
-              Desliza horizontalmente para ver todos los servicios. Selecciona tus especialidades favoritas.
+              Selecciona únicamente los oficios que puedes realizar. Después publica una tarifa para cada uno.
             </p>
+          </div>
+
+          {/* TARIFAS POR ESPECIALIDAD */}
+          <div className="space-y-4">
+            <div className="px-1">
+              <label className="text-[12px] font-black text-gray-300 uppercase tracking-widest">Tus precios publicados</label>
+              <p className="text-[12px] text-gray-400 mt-1">El cliente verá este precio al buscar el servicio. Los materiales se aclaran por separado.</p>
+            </div>
+            {Array.from(selectedServices).map(specialty => {
+              const service = ALL_SERVICES.find(item => item.key === specialty)
+              const rate = serviceRates[specialty] || { price_unit: 'por_proyecto', amount: '', includes_materials: false, note: '' }
+              return (
+                <div key={specialty} className="bg-gray-50 rounded-[24px] p-5 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-white text-brand flex items-center justify-center"><DollarSign size={18} /></div>
+                    <p className="text-[14px] font-black text-ink">{service?.label || specialty}</p>
+                  </div>
+                  <div className="grid grid-cols-[1fr_1.2fr] gap-3">
+                    <select value={rate.price_unit} onChange={e => updateRate(specialty, 'price_unit', e.target.value)} className="bg-white rounded-xl px-3 text-[13px] font-bold text-ink outline-none">
+                      {RATE_UNITS.map(unit => <option key={unit.key} value={unit.key}>{unit.label}</option>)}
+                    </select>
+                    {rate.price_unit === 'a_convenir' ? (
+                      <div className="bg-white rounded-xl px-3 flex items-center text-[12px] font-semibold text-gray-400">Cotizas tras revisar</div>
+                    ) : (
+                      <input type="number" min="1" placeholder="Precio en COP" value={rate.amount} onChange={e => updateRate(specialty, 'amount', e.target.value)} className="bg-white rounded-xl px-3 text-[14px] font-bold text-ink outline-none" />
+                    )}
+                  </div>
+                  <label className="flex items-center gap-2 text-[12px] font-semibold text-gray-500">
+                    <input type="checkbox" checked={rate.includes_materials} onChange={e => updateRate(specialty, 'includes_materials', e.target.checked)} className="accent-brand" />
+                    Incluye materiales
+                  </label>
+                  <input value={rate.note} maxLength="280" placeholder="Nota opcional, por ejemplo: incluye mano de obra" onChange={e => updateRate(specialty, 'note', e.target.value)} className="w-full bg-white rounded-xl px-3 py-3 text-[12px] font-medium text-ink outline-none" />
+                </div>
+              )
+            })}
+            {selectedServices.size === 0 && <p className="rounded-2xl bg-gray-50 p-4 text-[13px] text-gray-400">Primero selecciona tus especialidades para configurar sus precios.</p>}
           </div>
 
           </div>

@@ -25,7 +25,7 @@ const CLIENT_MENU = [
   {
     title: 'Cuenta',
     items: [
-      { icon: User,    label: 'Mis datos personales',    screen: 'ProfileEdit',  params: { section: 'personal' }, iconColor: '#6366f1', bg: '#eef2ff' },
+      { icon: User,    label: 'Mis datos personales',    screen: 'ProfileEdit',  params: { section: 'personal' }, iconColor: '#E8432D', bg: '#fdf0ee' },
       { icon: Bell,    label: 'Notificaciones',          screen: null,           iconColor: '#f97316', bg: '#fff7ed', isNotif: true },
       { icon: Shield,  label: 'Seguridad y privacidad',  screen: 'Security',     iconColor: '#10b981', bg: '#ecfdf5' },
     ],
@@ -46,13 +46,13 @@ const WORKER_MENU = [
     items: [
       { icon: Briefcase,   label: 'Mis trabajos',          screen: 'ProjectsTab', params: { screen: 'ProjectsTabScreen' }, iconColor: '#3b82f6', bg: '#eff6ff' },
       { icon: Star,        label: 'Mis calificaciones',    screen: 'MyRatings',  iconColor: '#f59e0b', bg: '#fffbeb' },
-      { icon: TrendingUp,  label: 'Mi perfil profesional', screen: 'ProfileEdit', params: { section: 'professional' }, iconColor: '#8b5cf6', bg: '#f5f3ff' },
+      { icon: TrendingUp,  label: 'Mi perfil profesional', screen: 'ProfileEdit', params: { section: 'professional' }, iconColor: '#E8432D', bg: '#fdf0ee' },
     ],
   },
   {
     title: 'Cuenta',
     items: [
-      { icon: User,    label: 'Mis datos personales',    screen: 'ProfileEdit',  params: { section: 'personal' }, iconColor: '#6366f1', bg: '#eef2ff' },
+      { icon: User,    label: 'Mis datos personales',    screen: 'ProfileEdit',  params: { section: 'personal' }, iconColor: '#E8432D', bg: '#fdf0ee' },
       { icon: Bell,    label: 'Notificaciones',          screen: null,           iconColor: '#f97316', bg: '#fff7ed', isNotif: true },
       { icon: Wallet,  label: 'Cuenta bancaria',         screen: 'BankAccount',  iconColor: '#0ea5e9', bg: '#f0f9ff' },
       { icon: Shield,  label: 'Seguridad y privacidad',  screen: 'Security',     iconColor: '#10b981', bg: '#ecfdf5' },

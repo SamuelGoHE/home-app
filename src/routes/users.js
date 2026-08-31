@@ -1,7 +1,7 @@
 const express = require('express');
 const { Op, fn, col, literal } = require('sequelize');
 const { sequelize } = require('../config/database');
-const { User, WorkerProfile, Rating, Project } = require('../models');
+const { User, WorkerProfile, WorkerServiceRate, Rating, Project } = require('../models');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { revokeAllRefreshTokens, blacklistAccessToken } = require('../utils/jwt');
 const { singlePhoto } = require('../middlewares/upload');
@@ -53,10 +53,36 @@ router.get('/workers', authenticate, async (req, res, next) => {
       where: includeWhere
     };
 
+    const workerIncludes = [includeClause];
+    // Cuando el cliente busca un oficio, solo se muestran quienes publicaron
+    // una tarifa para ese oficio. Así nunca se compara un precio genérico.
+    if (specialty) {
+      workerIncludes.push({
+        model: WorkerServiceRate,
+        as: 'serviceRates',
+        required: true,
+        where: { specialty },
+        attributes: ['id', 'specialty', 'price_unit', 'amount', 'includes_materials', 'note'],
+      });
+    } else {
+      workerIncludes.push({
+        model: WorkerServiceRate,
+        as: 'serviceRates',
+        required: false,
+        attributes: ['id', 'specialty', 'price_unit', 'amount', 'includes_materials', 'note'],
+      });
+    }
+
     const workers = await User.findAll({
       where: whereClause,
-      include: [includeClause],
-      attributes: ['id', 'name', 'email', 'avatar', 'role', 'is_active', 'city']
+      include: workerIncludes,
+      attributes: ['id', 'name', 'email', 'avatar', 'role', 'is_active', 'city'],
+      distinct: true,
+      // Con un oficio seleccionado, comparar por precio primero hace la lista
+      // útil desde la primera pantalla. Los valores a convenir (null) quedan al final.
+      order: specialty
+        ? [[{ model: WorkerServiceRate, as: 'serviceRates' }, 'amount', 'ASC NULLS LAST'], ['name', 'ASC']]
+        : [['name', 'ASC']],
     });
 
     // Enriquecer con calificaciones reales
@@ -102,6 +128,10 @@ router.get('/workers/:id', authenticate, async (req, res, next) => {
       include: [{
         model: WorkerProfile,
         as: 'workerProfile'
+      }, {
+        model: WorkerServiceRate,
+        as: 'serviceRates',
+        attributes: ['id', 'specialty', 'price_unit', 'amount', 'includes_materials', 'note'],
       }],
       attributes: ['id', 'name', 'email', 'avatar', 'city', 'rating_avg', 'rating_count']
     });
@@ -202,12 +232,60 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Solo los trabajadores pueden actualizar este perfil' });
     }
 
-    const { bio, years_experience, specialties, cities_covered, pricing_modes, daily_rate, contract_pricing_note } = req.body;
+    const { bio, years_experience, specialties, cities_covered, pricing_modes, daily_rate, contract_pricing_note, service_rates } = req.body;
 
     // pricing_modes solo admite 'por_dia'/'por_contrato'; si viene mal formado, se ignora en vez de fallar.
     const safePricingModes = Array.isArray(pricing_modes)
       ? pricing_modes.filter(m => ['por_dia', 'por_contrato'].includes(m))
       : undefined;
+
+    const allowedUnits = ['por_hora', 'por_dia', 'por_m2', 'por_proyecto', 'a_convenir'];
+    let safeServiceRates;
+    if (service_rates !== undefined) {
+      if (!Array.isArray(service_rates)) {
+        return res.status(400).json({ success: false, message: 'Las tarifas deben enviarse como una lista' });
+      }
+      const availableSpecialties = Array.isArray(specialties)
+        ? specialties
+        : (await WorkerProfile.findOne({ where: { user_id: req.user.id } }))?.specialties || [];
+      const seen = new Set();
+      safeServiceRates = service_rates.map(rate => ({
+        specialty: String(rate?.specialty || '').trim(),
+        price_unit: rate?.price_unit,
+        amount: rate?.amount === '' || rate?.amount == null ? null : Number(rate.amount),
+        includes_materials: !!rate?.includes_materials,
+        note: rate?.note ? String(rate.note).trim().slice(0, 280) : null,
+      }));
+      for (const rate of safeServiceRates) {
+        if (!rate.specialty || !availableSpecialties.includes(rate.specialty)) {
+          return res.status(400).json({ success: false, message: 'Solo puedes publicar precios para tus especialidades' });
+        }
+        if (seen.has(rate.specialty)) {
+          return res.status(400).json({ success: false, message: 'No puedes repetir la tarifa de una especialidad' });
+        }
+        seen.add(rate.specialty);
+        if (!allowedUnits.includes(rate.price_unit)) {
+          return res.status(400).json({ success: false, message: 'Unidad de cobro inválida' });
+        }
+        if (rate.price_unit !== 'a_convenir' && (!Number.isFinite(rate.amount) || rate.amount <= 0)) {
+          return res.status(400).json({ success: false, message: 'Indica un precio mayor que cero para cada tarifa fija' });
+        }
+      }
+    }
+
+    // Compatibilidad con la app móvil anterior: si aún envía su modalidad
+    // global, se publica la misma tarifa en cada especialidad seleccionada.
+    // La nueva pantalla puede enviar `service_rates` para valores distintos.
+    const legacyRates = safeServiceRates === undefined && Array.isArray(specialties) && safePricingModes !== undefined
+      ? specialties.map(specialty => ({
+          specialty,
+          price_unit: daily_rate ? 'por_dia' : 'a_convenir',
+          amount: daily_rate ? Number(daily_rate) : null,
+          includes_materials: false,
+          note: contract_pricing_note ? String(contract_pricing_note).trim().slice(0, 280) : null,
+        }))
+      : undefined;
+    const ratesToPersist = safeServiceRates ?? legacyRates;
 
     const workerProfile = await WorkerProfile.findOne({ where: { user_id: req.user.id } });
     if (!workerProfile) {
@@ -222,6 +300,9 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
         daily_rate: daily_rate || null,
         contract_pricing_note: contract_pricing_note || null,
       });
+      if (ratesToPersist) {
+        await WorkerServiceRate.bulkCreate(ratesToPersist.map(rate => ({ ...rate, worker_id: req.user.id })));
+      }
       return res.json({ success: true, data: newProfile, message: 'Perfil creado exitosamente' });
     }
 
@@ -235,6 +316,15 @@ router.put('/worker-profile', authenticate, async (req, res, next) => {
       daily_rate: daily_rate !== undefined ? daily_rate : workerProfile.daily_rate,
       contract_pricing_note: contract_pricing_note !== undefined ? contract_pricing_note : workerProfile.contract_pricing_note,
     });
+
+    if (ratesToPersist !== undefined) {
+      // Reemplazo atómico a nivel de perfil: las tarifas que el trabajador quitó
+      // dejan de estar disponibles en búsquedas nuevas, sin alterar solicitudes ya creadas.
+      await WorkerServiceRate.destroy({ where: { worker_id: req.user.id } });
+      if (ratesToPersist.length) {
+        await WorkerServiceRate.bulkCreate(ratesToPersist.map(rate => ({ ...rate, worker_id: req.user.id })));
+      }
+    }
 
     res.json({ success: true, data: workerProfile, message: 'Perfil actualizado exitosamente' });
   } catch (error) {
@@ -374,4 +464,3 @@ router.patch('/:id/toggle-active', authenticate, authorize('admin'), async (req,
 });
 
 module.exports = router;
-

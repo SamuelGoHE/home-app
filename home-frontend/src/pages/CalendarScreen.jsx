@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Calendar as CalendarIcon, Send, CalendarDays, FileSignature } from 'lucide-react'
+import { ArrowLeft, Calendar as CalendarIcon, Send } from 'lucide-react'
 import toast from 'react-hot-toast'
 import api from '../services/api'
 import { format, startOfMonth, getDaysInMonth, getDay, addMonths, isBefore, isEqual } from 'date-fns'
@@ -26,17 +26,15 @@ export default function CalendarScreen() {
   const sqMeters       = searchParams.get('sq_meters') || ''
   const occupied       = searchParams.get('occupied') === 'true'
   const notes          = searchParams.get('notes') || ''
-  const workerPricingModes = (searchParams.get('workerPricingModes') || '').split(',').filter(Boolean)
-  const workerDailyRate    = searchParams.get('workerDailyRate') || ''
-  const workerContractNote = searchParams.get('workerContractNote') || ''
-
-  const hasPricing = workerPricingModes.length > 0
-
-  // Si el trabajador solo ofrece una modalidad, se preselecciona; si ofrece ambas, el cliente elige.
-  const [pricingType, setPricingType] = useState(workerPricingModes[0] || null)
-
-  // Por día hay una tarifa fija; por contrato no hay un número — el trabajador cotiza al aceptar.
-  const modeReady = pricingType === 'por_dia' ? !!workerDailyRate : (pricingType === 'por_contrato' ? !!workerContractNote : false)
+  const workerRateUnit = searchParams.get('workerRateUnit') || ''
+  const workerRateAmount = searchParams.get('workerRateAmount') || ''
+  const workerRateNote = searchParams.get('workerRateNote') || ''
+  const hasPricing = !!workerRateUnit
+  const pricingType = workerRateUnit || null
+  const rateAmount = Number(workerRateAmount)
+  const isFixedRate = workerRateUnit !== 'a_convenir' && Number.isFinite(rateAmount) && rateAmount > 0
+  const estimatedTotal = workerRateUnit === 'por_m2' && sqMeters && isFixedRate ? rateAmount * Number(sqMeters) : (['por_dia', 'por_proyecto'].includes(workerRateUnit) && isFixedRate ? rateAmount : null)
+  const modeReady = hasPricing
   const canSubmit = !!startDate && hasPricing && modeReady && !loading
 
   const months = useMemo(() => [TODAY, addMonths(TODAY, 1), addMonths(TODAY, 2)], [])
@@ -123,45 +121,14 @@ export default function CalendarScreen() {
             <>
               <p className="text-[12px] text-muted mb-4">Este es el precio fijo que el trabajador cobra — no hay que ofertar.</p>
 
-              {workerPricingModes.length > 1 && (
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[
-                    { key: 'por_dia', label: 'Por día', icon: CalendarDays },
-                    { key: 'por_contrato', label: 'Por contrato', icon: FileSignature },
-                  ].map(({ key, label, icon: Icon }) => (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => setPricingType(key)}
-                      aria-pressed={pricingType === key}
-                      className={`flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 transition-all
-                        ${pricingType === key ? 'border-brand bg-brand-soft text-brand' : 'border-border text-muted'}`}
-                    >
-                      <Icon size={18} aria-hidden="true" />
-                      <span className="text-[12px] font-bold">{label}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {pricingType === 'por_dia' ? (
-                <div className="p-4 bg-gray-50 rounded-2xl flex items-center justify-between">
-                  <span className="text-[12px] font-bold text-muted uppercase tracking-wide">Precio por día</span>
-                  <span className="text-[20px] font-black text-ink">
-                    {workerDailyRate ? `$${Number(workerDailyRate).toLocaleString('es-CO')}` : '—'}
-                  </span>
-                </div>
-              ) : (
-                <div className="p-4 bg-gray-50 rounded-2xl">
-                  <span className="text-[12px] font-bold text-muted uppercase tracking-wide block mb-1.5">Cómo cotiza este trabajo</span>
-                  {workerContractNote ? (
-                    <p className="text-[13px] font-semibold text-ink leading-relaxed">{workerContractNote}</p>
-                  ) : (
-                    <p className="text-[13px] font-semibold text-amber-600">Este trabajador aún no describió cómo cotiza sus contratos</p>
-                  )}
-                  <p className="text-[11px] text-muted mt-2">El precio final te lo confirmará el trabajador después de revisar tu solicitud.</p>
-                </div>
-              )}
+              <div className="p-4 bg-gray-50 rounded-2xl">
+                {workerRateUnit === 'a_convenir' ? (
+                  <><span className="text-[12px] font-bold text-muted uppercase tracking-wide block mb-1.5">Precio a convenir</span><p className="text-[13px] font-semibold text-ink">El profesional confirmará el valor después de revisar el alcance.</p></>
+                ) : (
+                  <><span className="text-[12px] font-bold text-muted uppercase tracking-wide">Tarifa publicada</span><p className="text-[20px] font-black text-ink mt-1">${rateAmount.toLocaleString('es-CO')} <span className="text-[12px] text-muted">{workerRateUnit.replace('por_', 'por ')}</span></p>{estimatedTotal != null && <p className="text-[12px] font-semibold text-brand mt-2">Estimado: ${estimatedTotal.toLocaleString('es-CO')}</p>}</>
+                )}
+                {workerRateNote && <p className="text-[12px] text-muted mt-2">{workerRateNote}</p>}
+              </div>
             </>
           )}
         </Card>

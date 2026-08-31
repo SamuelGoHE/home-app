@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, ScrollView, TextInput,
   TouchableOpacity, Image, ActivityIndicator, Modal,
 } from 'react-native';
-import { Bell, Search, ChevronRight, Star, Zap, TrendingUp, Users, MessageCircle, X, CheckCircle, AlertCircle, Clock } from 'lucide-react-native';
+import { Bell, Search, ChevronRight, Star, Zap, TrendingUp, Users, MessageCircle, X, CheckCircle, AlertCircle, Clock, Wallet } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuthStore } from '../context/authStore';
 import { useServices, useProjects, useRecentRatings, useConversations } from '../hooks/useApi';
 import { useNotifications } from '../hooks/useNotifications';
@@ -59,6 +60,12 @@ const CATEGORY_META = {
 };
 const PLACEHOLDER_IMG = 'https://via.placeholder.com/600x400?text=Servicio';
 
+// Debe coincidir con PRE_PROGRESS_STATUSES en src/services/paymentService.js
+// (backend) — estados en los que el proyecto todavía no arrancó ni terminó,
+// y por lo tanto siempre implica que falta el pago inicial (ver
+// Projectdetailscreen.js, misma lógica).
+const PRE_PROGRESS_STATUSES = ['pendiente', 'en_revision', 'aprobado', 'pausado'];
+
 const getServiceImage = (svc) => {
   if (svc?.image_url) return { uri: svc.image_url };
   return CATEGORY_META[svc?.category]?.img || CATEGORY_META.otro.img || { uri: PLACEHOLDER_IMG };
@@ -83,6 +90,7 @@ const NOTIF_ICONS = {
   quote_rejected:  { Icon: AlertCircle,   color: '#ef4444' },
   project_active:  { Icon: TrendingUp,    color: '#3b82f6' },
   project_completed: { Icon: CheckCircle, color: '#10b981' },
+  payment_pending: { Icon: Wallet,        color: ICON.warning },
 };
 
 export default function HomeScreen({ navigation }) {
@@ -91,10 +99,19 @@ export default function HomeScreen({ navigation }) {
 
   const { user } = useAuthStore();
   const { data: services, loading: loadingSvc, error: errorSvc, refetch: refetchSvc } = useServices();
-  const { data: projects, loading: loadingProj } = useProjects();
+  const { data: projects, loading: loadingProj, refetch: refetchProjects } = useProjects();
   const { data: recentRatings, loading: loadingRatings } = useRecentRatings();
   const { data: conversations } = useConversations();
   const { notifications, hasUnreadNotifs, dismiss, dismissAll } = useNotifications();
+
+  // Refresca al volver a esta pantalla — clave para que "Proyectos activos"
+  // refleje un pago que se acaba de confirmar (ej. al volver del navegador
+  // de pago vía PaymentScreen, que no comparte esta instancia del hook).
+  useFocusEffect(
+    useCallback(() => {
+      refetchProjects();
+    }, [refetchProjects])
+  );
 
   const hasUnreadChats = (conversations || []).some(c => c.unread_count > 0);
 
@@ -262,7 +279,15 @@ export default function HomeScreen({ navigation }) {
                           </Text>
                           <Text className="text-[12px] text-gray-400 mt-0.5">{p.service?.name}</Text>
                         </View>
-                        <StatusBadge status={p.status} />
+                        <View className="items-end gap-1">
+                          <StatusBadge status={p.status} />
+                          {PRE_PROGRESS_STATUSES.includes(p.status) && (
+                            <View className="flex-row items-center gap-1 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
+                              <Wallet size={10} color={ICON.warning} />
+                              <Text className="text-[10px] font-bold text-amber-700">Pago pendiente</Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                       {tasks.length > 0 && (
                         <View className="mt-2">
@@ -439,9 +464,20 @@ export default function HomeScreen({ navigation }) {
                 notifications.map(notif => {
                   const meta = NOTIF_ICONS[notif.type] || NOTIF_ICONS.quote_pending;
                   const { Icon } = meta;
+                  const isPaymentPending = notif.type === 'payment_pending';
+                  const handlePress = () => {
+                    if (!isPaymentPending) return;
+                    setShowNotifs(false);
+                    navigation.navigate('ProjectsTab', {
+                      screen: 'Payment',
+                      params: { projectId: notif.projectId, projectTitle: notif.projectTitle, amount: notif.amount, type: 'inicial' },
+                    });
+                  };
                   return (
-                    <View
+                    <TouchableOpacity
                       key={notif.id}
+                      activeOpacity={isPaymentPending ? 0.7 : 1}
+                      onPress={handlePress}
                       className="flex-row gap-3 px-5 py-4 border-b border-gray-50"
                     >
                       <View
@@ -460,6 +496,9 @@ export default function HomeScreen({ navigation }) {
                         <Text className="text-[12px] text-gray-500 mt-0.5 leading-relaxed" numberOfLines={3}>
                           {notif.message}
                         </Text>
+                        {isPaymentPending && (
+                          <Text className="text-[11px] font-bold text-brand mt-1">Tocar para pagar →</Text>
+                        )}
                       </View>
                       <TouchableOpacity
                         onPress={() => dismiss(notif.id)}
@@ -470,7 +509,7 @@ export default function HomeScreen({ navigation }) {
                       >
                         <X size={13} color={ICON.faint} />
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
               )}

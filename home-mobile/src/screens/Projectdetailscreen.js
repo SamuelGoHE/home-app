@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     View, Text, ScrollView, TouchableOpacity,
     ActivityIndicator, Alert, Image, Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import {
     MapPin, MessageCircle, Star, Check, Camera, X, Calendar, Wallet,
@@ -93,7 +94,18 @@ export default function ProjectDetailScreen({ route, navigation }) {
     const { user } = useAuthStore();
     const { data: project, loading, error, refetch } = useProject(id);
     const { data: photos, loading: loadingPhotos, error: errorPhotos, refetch: refetchPhotos } = useProjectPhotos(id);
-    const { data: payments } = usePayments(id);
+    const { data: payments, refetch: refetchPayments } = usePayments(id);
+
+    // Refresca al volver a esta pantalla — clave para reflejar un pago que
+    // se acaba de confirmar al volver del navegador externo (PaymentScreen
+    // no comparte esta instancia de useProject/usePayments).
+    useFocusEffect(
+        useCallback(() => {
+            refetch();
+            refetchPayments();
+        }, [refetch, refetchPayments])
+    );
+
     const [updating, setUpdating] = useState(false);
     const [photoStage, setPhotoStage] = useState('antes');
     const [uploadingPhoto, setUploadingPhoto] = useState(false);

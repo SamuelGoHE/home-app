@@ -12,10 +12,15 @@ const WorkerPayoutAccount = require('./WorkerPayoutAccount');
 const Payment = require('./Payment');
 const Payout = require('./Payout');
 const Refund = require('./Refund');
+const WorkerServiceRate = require('./WorkerServiceRate');
 
 // WorkerProfile ↔ User
 User.hasOne(WorkerProfile, { foreignKey: 'user_id', as: 'workerProfile' });
 WorkerProfile.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// Tarifas públicas del trabajador por especialidad
+User.hasMany(WorkerServiceRate, { foreignKey: 'worker_id', as: 'serviceRates', onDelete: 'CASCADE' });
+WorkerServiceRate.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
 
 // Project ↔ Users
 User.hasMany(Project, { foreignKey: 'client_id', as: 'clientProjects' });
@@ -48,6 +53,8 @@ User.hasMany(Quote, { foreignKey: 'worker_id', as: 'workerQuotes' });
 Quote.belongsTo(User, { foreignKey: 'worker_id', as: 'worker' });
 Project.hasOne(Quote, { foreignKey: 'project_id', as: 'quote' });
 Quote.belongsTo(Project, { foreignKey: 'project_id', as: 'project' });
+WorkerServiceRate.hasMany(Quote, { foreignKey: 'service_rate_id', as: 'quotes' });
+Quote.belongsTo(WorkerServiceRate, { foreignKey: 'service_rate_id', as: 'serviceRate' });
 
 // Rating ↔ Users + Project
 User.hasMany(Rating, { foreignKey: 'reviewer_id', as: 'givenRatings' });
@@ -106,5 +113,5 @@ Refund.belongsTo(Payment, { foreignKey: 'payment_id', as: 'payment' });
 
 module.exports = {
   User, Service, Project, Task, Quote, WorkerProfile, Rating, Message,
-  ProjectPhoto, WorkerPortfolioPhoto, WorkerPayoutAccount, Payment, Payout, Refund,
+  ProjectPhoto, WorkerPortfolioPhoto, WorkerPayoutAccount, Payment, Payout, Refund, WorkerServiceRate,
 };

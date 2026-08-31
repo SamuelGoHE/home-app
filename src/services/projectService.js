@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Project, Task, Service, User, Quote, WorkerProfile, Rating, Payment } = require('../models');
+const { Project, Task, Service, User, Quote, WorkerProfile, WorkerServiceRate, Rating, Payment } = require('../models');
 const refundService = require('./refundService');
 
 // ── SERVICIOS ──────────────────────────────────────────────
@@ -185,11 +185,9 @@ const assignTask = async (taskId, workerId) => {
  * Crea una solicitud de servicio dirigida a un trabajador específico.
  * Status inicial: 'solicitud_pendiente' — el trabajador debe aceptar o rechazar.
  *
- * El precio no lo escribe el cliente. Por día el trabajador ya publicó una tarifa fija
- * (`daily_rate`) y esa es la `estimated_price` desde ya. Por contrato no hay un precio fijo
- * posible (depende de m², materiales, alcance): el trabajador solo describe cómo cotiza
- * (`contract_pricing_note`) y define el monto real al aceptar esta solicitud puntual —
- * `estimated_price` queda en null hasta entonces.
+ * El cliente no puede escribir el precio: se usa la tarifa vigente que el trabajador
+ * publicó para la categoría del servicio. La unidad y el precio se guardan como foto
+ * en la solicitud para proteger ambos lados si el profesional cambia su perfil después.
  */
 const createQuote = async (data, clientId, io) => {
   const service = await Service.findByPk(data.service_id);
@@ -202,24 +200,20 @@ const createQuote = async (data, clientId, io) => {
   const client = await User.findByPk(clientId);
   if (!client) { const e = new Error('Cliente no encontrado'); e.statusCode = 404; throw e; }
 
-  const workerProfile = await WorkerProfile.findOne({ where: { user_id: data.worker_id } });
-  const pricingModes = workerProfile?.pricing_modes || [];
-  if (pricingModes.length === 0) {
-    const e = new Error('Este trabajador todavía no definió sus tarifas'); e.statusCode = 400; throw e;
+  const serviceRate = await WorkerServiceRate.findOne({
+    where: { worker_id: data.worker_id, specialty: service.category },
+  });
+  if (!serviceRate) {
+    const e = new Error('Este trabajador no tiene un precio publicado para este servicio'); e.statusCode = 400; throw e;
   }
 
-  const pricing_type = pricingModes.includes(data.pricing_type)
-    ? data.pricing_type
-    : pricingModes[0];
-
+  const pricing_type = serviceRate.price_unit;
+  const rateAmount = serviceRate.amount == null ? null : Number(serviceRate.amount);
   let estimated_price = null;
-  if (pricing_type === 'por_dia') {
-    estimated_price = workerProfile.daily_rate;
-    if (estimated_price == null) {
-      const e = new Error('Este trabajador no tiene definida una tarifa por día'); e.statusCode = 400; throw e;
-    }
-  } else if (!workerProfile.contract_pricing_note) {
-    const e = new Error('Este trabajador todavía no describió cómo cotiza sus contratos'); e.statusCode = 400; throw e;
+  if (pricing_type === 'por_m2' && data.sq_meters && rateAmount != null) {
+    estimated_price = rateAmount * Number(data.sq_meters);
+  } else if (['por_dia', 'por_proyecto'].includes(pricing_type)) {
+    estimated_price = rateAmount;
   }
 
   const quote = await Quote.create({
@@ -228,13 +222,16 @@ const createQuote = async (data, clientId, io) => {
     sq_meters: data.sq_meters || null,
     occupied: !!data.occupied,
     start_date: data.start_date || null,
-    end_date: null,
+    // Solo aplica cuando el trabajador cobra por día — por cualquier otra
+    // unidad (hora/m²/proyecto/a convenir) el cliente elige un único día.
+    end_date: pricing_type === 'por_dia' ? (data.end_date || null) : null,
     notes: data.notes || null,
     service_id: data.service_id,
     worker_id: data.worker_id,
     client_id: clientId,
     pricing_type,
     estimated_price,
+    service_rate_id: serviceRate.id,
     status: 'solicitud_pendiente',
     expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });

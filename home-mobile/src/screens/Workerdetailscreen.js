@@ -94,6 +94,7 @@ export default function WorkerDetailScreen({ route, navigation }) {
     }
 
     const profile = worker.workerProfile || {};
+    const selectedRate = worker.serviceRates?.find(rate => rate.specialty === serviceCategory);
     const stats = worker.stats || {};
 
     const avgRating = stats.rating_count && stats.rating_count > 0 
@@ -125,9 +126,9 @@ export default function WorkerDetailScreen({ route, navigation }) {
             sq_meters,
             occupied,
             notes,
-            workerPricingModes: profile.pricing_modes || [],
-            workerDailyRate: profile.daily_rate || '',
-            workerContractNote: profile.contract_pricing_note || '',
+            workerRateUnit: selectedRate?.price_unit || '',
+            workerRateAmount: selectedRate?.amount || '',
+            workerRateNote: selectedRate?.note || '',
         });
     };
 
@@ -213,36 +214,16 @@ export default function WorkerDetailScreen({ route, navigation }) {
                         {profile.bio || 'Profesional dedicado y comprometido con la excelencia.'}
                     </Text>
 
-                    {/* Cómo cobra este trabajador */}
-                    {profile.pricing_modes?.length > 0 && (
+                    {/* Precio publicado para el servicio seleccionado */}
+                    {selectedRate && (
                         <View className="mt-4 bg-gray-50 rounded-2xl p-4 border border-gray-100">
                             <Text className="text-[11px] font-bold text-gray-400 uppercase tracking-wide mb-2">
-                                Cómo cobra
+                                Precio para este servicio
                             </Text>
-                            <View className="flex-row flex-wrap gap-2">
-                                {profile.pricing_modes.includes('por_dia') && (
-                                    <View className="flex-row items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5">
-                                        <CalendarDays size={13} color={ICON.brand} />
-                                        <Text className="text-[12px] font-bold text-ink">
-                                            Por día{profile.daily_rate ? ` · $${Number(profile.daily_rate).toLocaleString('es-CO')}` : ''}
-                                        </Text>
-                                    </View>
-                                )}
-                                {profile.pricing_modes.includes('por_contrato') && (
-                                    <View className="flex-row items-center gap-1.5 bg-white border border-gray-100 rounded-full px-3 py-1.5">
-                                        <FileSignature size={13} color={ICON.brand} />
-                                        <Text className="text-[12px] font-bold text-ink">Por contrato</Text>
-                                    </View>
-                                )}
-                            </View>
-                            {profile.pricing_modes.includes('por_contrato') && profile.contract_pricing_note && (
-                                <Text className="text-[12px] text-gray-500 mt-2 leading-relaxed">
-                                    {profile.contract_pricing_note}
-                                </Text>
-                            )}
-                            <Text className="text-[11px] text-gray-400 mt-2">
-                                Precio fijo del trabajador — sin negociación.
+                            <Text className="text-[20px] font-black text-ink">
+                                {selectedRate.price_unit === 'a_convenir' ? 'Cotiza tras revisar' : `$${Number(selectedRate.amount).toLocaleString('es-CO')} ${selectedRate.price_unit.replace('por_', 'por ')}`}
                             </Text>
+                            <Text className="text-[12px] text-gray-500 mt-2">{selectedRate.includes_materials ? 'Incluye materiales. ' : 'No incluye materiales. '}{selectedRate.note || ''}</Text>
                         </View>
                     )}
 

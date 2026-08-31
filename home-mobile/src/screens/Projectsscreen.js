@@ -5,7 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     Search, X,
-    ChevronRight, Calendar, Star,
+    ChevronRight, Calendar, Star, Wallet,
 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useProjects, useMyQuotes } from '../hooks/useApi';
@@ -28,6 +28,11 @@ const ICON = {
 // amber está atado al concepto de "rating/estrellas", no a un estado de
 // proyecto (mismo criterio ya aplicado en Projectdetailscreen.js).
 const RATING_COLOR = '#f59e0b';
+
+// Debe coincidir con PRE_PROGRESS_STATUSES en src/services/paymentService.js
+// (backend) y HomeScreen.js — estados donde el proyecto siempre implica que
+// falta el pago inicial (ver Projectdetailscreen.js, misma lógica).
+const PRE_PROGRESS_STATUSES = ['pendiente', 'en_revision', 'aprobado', 'pausado'];
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 function formatDate(d) {
@@ -236,9 +241,15 @@ export default function ProjectsScreen({ navigation }) {
                             {/* Card header */}
                             <View className="flex-row items-start justify-between gap-3 mb-3">
                                 <View className="flex-1 min-w-0">
-                                    {/* Status badge */}
-                                    <View className="mb-2">
+                                    {/* Status badge (+ aviso de pago pendiente, glanceable sin entrar al detalle) */}
+                                    <View className="flex-row items-center gap-1.5 mb-2">
                                         <StatusBadge status={project.status} />
+                                        {!isQuote && PRE_PROGRESS_STATUSES.includes(project.status) && (
+                                            <View className="flex-row items-center gap-1 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5">
+                                                <Wallet size={10} color={RATING_COLOR} />
+                                                <Text className="text-[10px] font-bold text-amber-700">Pago pendiente</Text>
+                                            </View>
+                                        )}
                                     </View>
 
                                     <Text className="font-extrabold text-[16px] text-ink" numberOfLines={1}>
@@ -274,6 +285,7 @@ export default function ProjectsScreen({ navigation }) {
                                     </Text>
                                 </View>
                             )}
+
 
                             {/* Progress bar — patrón canónico: track gris, fill brand en curso / success al completar */}
                             {!isQuote && tasks.length > 0 && (

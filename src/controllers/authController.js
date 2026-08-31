@@ -2,7 +2,7 @@
 
 const { validationResult } = require('express-validator');
 const authService = require('../services/authService');
-const { User, WorkerProfile } = require('../models');
+const { User, WorkerProfile, WorkerServiceRate } = require('../models');
 
 const register = async (req, res) => {
   const errors = validationResult(req);
@@ -55,7 +55,10 @@ const getMe = async (req, res) => {
   // Recargamos al usuario incluyendo su perfil profesional (si es trabajador)
   // para que la app pueda mostrar/editar bio, especialidades, etc.
   const user = await User.findByPk(req.user.id, {
-    include: [{ model: WorkerProfile, as: 'workerProfile' }],
+    include: [
+      { model: WorkerProfile, as: 'workerProfile' },
+      { model: WorkerServiceRate, as: 'serviceRates', attributes: ['id', 'specialty', 'price_unit', 'amount', 'includes_materials', 'note'] },
+    ],
   });
   res.json({ success: true, data: { user: (user || req.user).toSafeJSON() } });
 };

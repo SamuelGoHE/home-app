@@ -6,11 +6,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
     ArrowLeft, Calendar as CalendarIcon, Send,
-    CalendarDays, FileSignature,
 } from 'lucide-react-native';
 import {
     format, startOfMonth, getDaysInMonth, getDay,
-    addMonths, isBefore, isEqual,
+    addMonths, isBefore, isAfter, isEqual,
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import api from '../services/api';
@@ -34,7 +33,7 @@ const ICON = {
 };
 
 /* ─── MonthGrid ──────────────────────────────────────────────────── */
-function MonthGrid({ month, selectedDate, onSelect }) {
+function MonthGrid({ month, startDate, endDate, rangeMode, onSelect }) {
     const firstDay = getDay(startOfMonth(month));
     const days = getDaysInMonth(month);
 
@@ -72,34 +71,51 @@ function MonthGrid({ month, selectedDate, onSelect }) {
                             if (!date) return <View key={ci} className="flex-1" />;
 
                             const isPast = isBefore(date, TODAY);
-                            const isSelected = !!(selectedDate && isEqual(date, selectedDate));
+                            const isStart = !!(startDate && isEqual(date, startDate));
+                            const isEnd = !!(endDate && isEqual(date, endDate));
+                            const isEndpoint = isStart || isEnd;
+                            const isInRange = rangeMode && !!(startDate && endDate && isAfter(date, startDate) && isBefore(date, endDate));
+                            const label = isEndpoint || isInRange
+                                ? `${format(date, "d 'de' MMMM", { locale: es })}${isStart ? ', inicio' : isEnd ? ', fin' : ', dentro del rango'}`
+                                : format(date, "d 'de' MMMM", { locale: es });
 
                             return (
                                 <View key={ci} className="flex-1 items-center">
-                                    <Pressable
-                                        onPress={() => !isPast && onSelect(date)}
-                                        disabled={isPast}
-                                        accessibilityRole="button"
-                                        accessibilityLabel={format(date, "d 'de' MMMM", { locale: es })}
-                                        accessibilityState={{ selected: isSelected, disabled: isPast }}
-                                        className={`w-9 h-9 items-center justify-center rounded-full ${isSelected ? 'bg-brand' : ''
-                                            }`}
-                                        style={isSelected
-                                            ? { shadowColor: ICON.brand, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }
-                                            : undefined
-                                        }
+                                    <View
+                                        className={[
+                                            'w-full h-9 items-center justify-center',
+                                            isInRange ? 'bg-brand/15' : '',
+                                            isStart && rangeMode ? 'rounded-l-full' : '',
+                                            isEnd && rangeMode ? 'rounded-r-full' : '',
+                                        ].filter(Boolean).join(' ')}
                                     >
-                                        <Text
-                                            className={`text-[14px] font-semibold ${isPast
-                                                    ? 'text-gray-300'
-                                                    : isSelected
-                                                        ? 'text-white'
-                                                        : 'text-ink'
+                                        <Pressable
+                                            onPress={() => !isPast && onSelect(date)}
+                                            disabled={isPast}
+                                            accessibilityRole="button"
+                                            accessibilityLabel={label}
+                                            accessibilityState={{ selected: isEndpoint, disabled: isPast }}
+                                            className={`w-9 h-9 items-center justify-center rounded-full ${isEndpoint ? 'bg-brand' : ''
                                                 }`}
+                                            style={isEndpoint
+                                                ? { shadowColor: ICON.brand, shadowOpacity: 0.3, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } }
+                                                : undefined
+                                            }
                                         >
-                                            {date.getDate()}
-                                        </Text>
-                                    </Pressable>
+                                            <Text
+                                                className={`text-[14px] font-semibold ${isPast
+                                                        ? 'text-gray-300'
+                                                        : isEndpoint
+                                                            ? 'text-white'
+                                                            : isInRange
+                                                                ? 'text-brand'
+                                                                : 'text-ink'
+                                                    }`}
+                                            >
+                                                {date.getDate()}
+                                            </Text>
+                                        </Pressable>
+                                    </View>
                                 </View>
                             );
                         })}
@@ -111,11 +127,12 @@ function MonthGrid({ month, selectedDate, onSelect }) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   CALENDAR SCREEN — el cliente elige solo la fecha de inicio;
-   la duración del trabajo la define el profesional.
+   CALENDAR SCREEN — si el trabajador cobra por día, el cliente elige un
+   rango (inicio + fin); para cualquier otra tarifa (hora/m²/proyecto/a
+   convenir) solo elige un único día en que necesita que empiece.
    Params: { workerId, serviceId, serviceName, city, address,
              sq_meters, occupied, notes,
-             workerPricingModes, workerDailyRate, workerContractRate }
+             workerRateUnit, workerRateAmount, workerRateNote }
 ══════════════════════════════════════════════════════════════════ */
 export default function CalendarScreen({ route, navigation }) {
     const {
@@ -127,29 +144,56 @@ export default function CalendarScreen({ route, navigation }) {
         sq_meters = '',
         occupied = false,
         notes = '',
-        workerPricingModes = [],
-        workerDailyRate = '',
-        workerContractNote = '',
+        workerRateUnit = '',
+        workerRateAmount = '',
+        workerRateNote = '',
     } = route.params || {};
 
-    const hasPricing = workerPricingModes.length > 0;
+    const isQuoted = workerRateUnit === 'a_convenir';
+    const hasPricing = !!workerRateUnit;
+    const rangeMode = workerRateUnit === 'por_dia';
+    const workerDailyRate = workerRateUnit === 'por_dia' ? workerRateAmount : '';
+    const calculatedM2 = workerRateUnit === 'por_m2' && sq_meters && Number(workerRateAmount) > 0
+      ? Number(workerRateAmount) * Number(sq_meters)
+      : null;
+    const workerContractNote = workerRateNote || (isQuoted
+      ? 'El profesional confirmará el valor después de revisar el alcance.'
+      : `${workerRateUnit === 'por_m2' && calculatedM2 ? `Estimado para ${sq_meters} m²: $${calculatedM2.toLocaleString('es-CO')}. ` : ''}Tarifa: $${Number(workerRateAmount).toLocaleString('es-CO')} ${workerRateUnit.replace('por_', 'por ')}`);
 
     const [startDate, setStartDate] = useState(null);
+    const [endDate, setEndDate] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [pricingType, setPricingType] = useState(workerPricingModes[0] || null);
 
-    // Por día hay una tarifa fija; por contrato no hay un número — el trabajador cotiza al aceptar.
-    const modeReady = pricingType === 'por_dia' ? !!workerDailyRate : (pricingType === 'por_contrato' ? !!workerContractNote : false);
-    const canSubmit = !!startDate && hasPricing && modeReady && !loading;
+    const canSubmit = !!startDate && (!rangeMode || !!endDate) && hasPricing && !loading;
 
     const months = useMemo(
         () => [TODAY, addMonths(TODAY, 1), addMonths(TODAY, 2)],
         []
     );
 
-    // Tocar un día lo selecciona; tocar el mismo día lo deselecciona
+    // Fecha única: tocar selecciona, tocar el mismo día deselecciona.
+    // Rango (por día): primer toque = inicio; segundo toque después del
+    // inicio = fin; tocar antes del inicio reinicia el rango desde ahí;
+    // con inicio y fin ya puestos, el siguiente toque empieza un rango nuevo.
     const selectDay = (date) => {
-        setStartDate(prev => (prev && isEqual(date, prev) ? null : date));
+        if (!rangeMode) {
+            setStartDate(prev => (prev && isEqual(date, prev) ? null : date));
+            return;
+        }
+        if (!startDate || (startDate && endDate)) {
+            setStartDate(date);
+            setEndDate(null);
+            return;
+        }
+        if (isEqual(date, startDate)) {
+            setStartDate(null);
+            return;
+        }
+        if (isBefore(date, startDate)) {
+            setStartDate(date);
+            return;
+        }
+        setEndDate(date);
     };
 
     const handleConfirm = async () => {
@@ -171,7 +215,7 @@ export default function CalendarScreen({ route, navigation }) {
                 occupied,
                 notes,
                 start_date: format(startDate, 'yyyy-MM-dd'),
-                pricing_type: pricingType,
+                end_date: rangeMode && endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
             });
 
             // Ir directamente a los proyectos sin alert
@@ -242,36 +286,7 @@ export default function CalendarScreen({ route, navigation }) {
                                 Este es el precio fijo que el trabajador cobra — no hay que ofertar.
                             </Text>
 
-                            {workerPricingModes.length > 1 && (
-                                <View className="flex-row gap-3 mb-4">
-                                    {[
-                                        { key: 'por_dia', label: 'Por día', Icon: CalendarDays },
-                                        { key: 'por_contrato', label: 'Por contrato', Icon: FileSignature },
-                                    ].map(({ key, label, Icon }) => {
-                                        const active = pricingType === key;
-                                        return (
-                                            <Pressable
-                                                key={key}
-                                                onPress={() => setPricingType(key)}
-                                                accessibilityRole="button"
-                                                accessibilityState={{ selected: active }}
-                                                className="flex-1 items-center gap-1.5 py-3 rounded-2xl border"
-                                                style={{
-                                                    borderColor: active ? ICON.brand : '#f3f4f6',
-                                                    backgroundColor: active ? '#fff7ed' : '#fff',
-                                                }}
-                                            >
-                                                <Icon size={18} color={active ? ICON.brand : '#9ca3af'} />
-                                                <Text className="text-[12px] font-bold" style={{ color: active ? ICON.brand : '#9ca3af' }}>
-                                                    {label}
-                                                </Text>
-                                            </Pressable>
-                                        );
-                                    })}
-                                </View>
-                            )}
-
-                            {pricingType === 'por_dia' ? (
+                            {rangeMode ? (
                                 <View className="p-4 bg-gray-50 rounded-2xl flex-row items-center justify-between">
                                     <Text className="text-[12px] font-bold text-muted uppercase tracking-wide">Precio por día</Text>
                                     <Text className="text-[20px] font-black text-ink">
@@ -311,7 +326,7 @@ export default function CalendarScreen({ route, navigation }) {
                                 {format(month, 'yyyy')}
                             </Text>
                         </View>
-                        <MonthGrid month={month} selectedDate={startDate} onSelect={selectDay} />
+                        <MonthGrid month={month} startDate={startDate} endDate={endDate} rangeMode={rangeMode} onSelect={selectDay} />
                     </Card>
                 ))}
             </ScrollView>
@@ -325,7 +340,7 @@ export default function CalendarScreen({ route, navigation }) {
                     </View>
                     <View className="flex-1">
                         <Text className="text-[10px] font-bold text-muted uppercase tracking-wide mb-0.5">
-                            Fecha de inicio
+                            {rangeMode ? 'Fecha de inicio' : 'Fecha'}
                         </Text>
                         <Text
                             className={`text-[14px] font-bold capitalize ${startDate ? 'text-ink' : 'text-muted'}`}
@@ -335,6 +350,23 @@ export default function CalendarScreen({ route, navigation }) {
                                 ? format(startDate, "EEEE d 'de' MMMM", { locale: es })
                                 : 'Toca un día en el calendario'}
                         </Text>
+                        {rangeMode && (
+                            <>
+                                <Text className="text-[10px] font-bold text-muted uppercase tracking-wide mb-0.5 mt-2">
+                                    Fecha de fin
+                                </Text>
+                                <Text
+                                    className={`text-[14px] font-bold capitalize ${endDate ? 'text-ink' : 'text-muted'}`}
+                                    numberOfLines={1}
+                                >
+                                    {endDate
+                                        ? format(endDate, "EEEE d 'de' MMMM", { locale: es })
+                                        : startDate
+                                            ? 'Toca el último día'
+                                            : 'Elige primero el inicio'}
+                                </Text>
+                            </>
+                        )}
                     </View>
                 </View>
 

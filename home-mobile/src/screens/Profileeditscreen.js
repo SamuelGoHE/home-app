@@ -29,27 +29,40 @@ const SPECIALTIES = [
 const SPECIALTY_LABEL = Object.fromEntries(SPECIALTIES.map(s => [s.key, s.label]));
 const PORTFOLIO_LIMIT = 20;
 
+/* ─── Unidades de precio por especialidad ──────────────────────────
+   Antes era un solo botón que ciclaba entre 3 de las 5 unidades que en
+   realidad soporta el backend (WorkerServiceRate.price_unit) — nunca se
+   podía elegir "por hora" ni "a convenir", y no quedaba claro que fuera
+   un selector (parecía una etiqueta fija). Ahora es una fila de chips,
+   mismo patrón visual que el selector de especialidades de más arriba. */
+const PRICE_UNIT_OPTIONS = [
+  { key: 'por_hora',     label: 'Por hora' },
+  { key: 'por_dia',      label: 'Por día' },
+  { key: 'por_m2',       label: 'Por m²' },
+  { key: 'por_proyecto', label: 'Por proyecto' },
+  { key: 'a_convenir',   label: 'A convenir' },
+];
+
 /*
- * Identidad de cada sección — acento por sección (indigo/violeta), no un
- * estado de proyecto ni una decisión meramente decorativa: es la forma en
- * que la pantalla distingue "datos personales" de "perfil profesional" en
- * cada elemento (insignia, avatar, CTA). No coincide con ningún token
- * semántico del Design System, así que se queda como color local, igual que
- * el mapa PRIORITY_UI del piloto (Projectdetailscreen.js).
+ * Identidad de cada sección — antes tenía un acento por sección
+ * (indigo/violeta) sin relación con el resto de la app. Se unifica al color
+ * de marca (mismo #E8432D que el resto de HOME) para que "datos personales"
+ * y "perfil profesional" se sientan parte de la misma aplicación en vez de
+ * parecer una sección aparte.
  */
 const SECTION_META = {
   personal: {
     title:    'Mis datos personales',
     subtitle: 'Tu información de contacto privada',
-    color:    '#6366f1',
-    bg:       '#eef2ff',
+    color:    '#E8432D',
+    bg:       '#fdf0ee',
     Icon:     UserIcon,
   },
   professional: {
     title:    'Mi perfil profesional',
     subtitle: 'Lo que tus clientes ven de ti',
-    color:    '#8b5cf6',
-    bg:       '#f5f3ff',
+    color:    '#E8432D',
+    bg:       '#fdf0ee',
     Icon:     Briefcase,
   },
 };
@@ -105,6 +118,25 @@ export default function ProfileEditScreen({ navigation, route }) {
   const [pricingModes, setPricingModes] = useState(
     new Set(user?.workerProfile?.pricing_modes || [])
   );
+  const [serviceRates, setServiceRates] = useState(() => {
+    const published = Object.fromEntries((user?.serviceRates || []).map(rate => [rate.specialty, {
+      price_unit: rate.price_unit,
+      amount: rate.amount ? String(rate.amount) : '',
+      includes_materials: !!rate.includes_materials,
+      note: rate.note || '',
+    }]));
+    // Los perfiles creados antes de este cambio tenían una tarifa diaria única.
+    // La mostramos como punto de partida en cada oficio para que editar el perfil
+    // no exija volver a digitar todos los valores desde cero.
+    (user?.workerProfile?.specialties || []).forEach(specialty => {
+      if (!published[specialty]) {
+        published[specialty] = user?.workerProfile?.daily_rate
+          ? { price_unit: 'por_dia', amount: String(user.workerProfile.daily_rate), includes_materials: false, note: '' }
+          : { price_unit: 'a_convenir', amount: '', includes_materials: false, note: '' };
+      }
+    });
+    return published;
+  });
 
   const [saving, setSaving] = useState(false);
   const [saved,  setSaved]  = useState(false);
@@ -133,7 +165,15 @@ export default function ProfileEditScreen({ navigation, route }) {
       const has = p.specialties.includes(key);
       return { ...p, specialties: has ? p.specialties.filter(s => s !== key) : [...p.specialties, key] };
     });
+    setServiceRates(prev => {
+      if (prev[key]) { const { [key]: _rate, ...rest } = prev; return rest; }
+      return { ...prev, [key]: { price_unit: 'por_proyecto', amount: '', includes_materials: false, note: '' } };
+    });
   };
+
+  const setRate = (specialty, field, value) => setServiceRates(prev => ({
+    ...prev, [specialty]: { ...prev[specialty], [field]: value },
+  }));
 
   const togglePricingMode = (mode) => {
     setSaved(false);
@@ -161,6 +201,13 @@ export default function ProfileEditScreen({ navigation, route }) {
       Alert.alert('Error', 'Describe cómo cotizas tus contratos');
       return;
     }
+    if (section === 'professional' && workerProfile.specialties.some(key => {
+      const rate = serviceRates[key];
+      return rate?.price_unit !== 'a_convenir' && (!rate?.amount || Number(rate.amount) <= 0);
+    })) {
+      Alert.alert('Error', 'Indica un precio válido para cada especialidad.');
+      return;
+    }
     setSaving(true);
     try {
       if (section === 'personal') {
@@ -185,6 +232,11 @@ export default function ProfileEditScreen({ navigation, route }) {
           contract_pricing_note: pricingModes.has('por_contrato') && workerProfile.contract_pricing_note
             ? workerProfile.contract_pricing_note.trim()
             : null,
+          service_rates: workerProfile.specialties.map(specialty => ({
+            specialty,
+            ...serviceRates[specialty],
+            amount: serviceRates[specialty]?.amount ? Number(serviceRates[specialty].amount) : null,
+          })),
         });
       }
 
@@ -615,6 +667,54 @@ export default function ProfileEditScreen({ navigation, route }) {
                     );
                   })}
                 </View>
+              </Card>
+
+              <Text className="text-[13px] font-bold text-gray-500 uppercase tracking-wider mt-6 mb-3 ml-1">
+                Precios por especialidad
+              </Text>
+              <Card padding="lg">
+                <Text className="text-[11px] text-gray-400 mb-4">Estos son los precios que verá el cliente al buscar cada servicio.</Text>
+                {workerProfile.specialties.map(key => {
+                  const rate = serviceRates[key] || { price_unit: 'por_proyecto', amount: '', note: '' };
+                  return (
+                    <View key={key} className="bg-background rounded-2xl p-4 mb-3">
+                      <Text className="text-[14px] font-bold text-ink mb-3">{SPECIALTY_LABEL[key] || key}</Text>
+
+                      <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">¿Cómo cobras este servicio?</Text>
+                      <View className="flex-row flex-wrap gap-2 mb-3">
+                        {PRICE_UNIT_OPTIONS.map(({ key: unitKey, label }) => {
+                          const active = rate.price_unit === unitKey;
+                          return (
+                            <TouchableOpacity
+                              key={unitKey}
+                              onPress={() => setRate(key, 'price_unit', unitKey)}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: active }}
+                              className="px-3 py-2 rounded-xl border"
+                              style={{ backgroundColor: active ? meta.color : '#fff', borderColor: active ? meta.color : '#e5e7eb' }}
+                              activeOpacity={0.8}
+                            >
+                              <Text className={`text-[12px] font-bold ${active ? 'text-white' : 'text-gray-600'}`}>{label}</Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {rate.price_unit === 'a_convenir' ? (
+                        <Text className="text-[11px] text-gray-400">El precio lo confirmas directamente con cada cliente al aceptar la solicitud.</Text>
+                      ) : (
+                        <TextInput
+                          value={rate.amount}
+                          onChangeText={value => setRate(key, 'amount', value)}
+                          keyboardType="numeric"
+                          placeholder="Precio en COP"
+                          className="bg-white rounded-xl px-3 py-3 font-bold text-ink border border-gray-100"
+                        />
+                      )}
+                    </View>
+                  );
+                })}
+                {workerProfile.specialties.length === 0 && <Text className="text-[12px] text-gray-400">Selecciona una especialidad para publicar su precio.</Text>}
               </Card>
 
               {/* Portafolio */}

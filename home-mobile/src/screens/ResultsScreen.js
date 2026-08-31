@@ -37,6 +37,10 @@ const AVATAR_FALLBACK =
 ══════════════════════════════════════════════════════════════════ */
 function WorkerCard({ worker, onPress }) {
   const profile = worker.workerProfile || {};
+  const rate = worker.serviceRates?.[0];
+  const rateText = !rate || rate.price_unit === 'a_convenir'
+    ? 'Cotiza tras revisar'
+    : `$${Number(rate.amount).toLocaleString('es-CO')} / ${rate.price_unit.replace('por_', 'por ')}`;
 
   return (
     <Card
@@ -86,6 +90,9 @@ function WorkerCard({ worker, onPress }) {
             </Text>
           </View>
         )}
+        <Text className="text-[12px] font-extrabold text-brand mt-2">
+          {rateText}{rate?.includes_materials ? ' · Incluye materiales' : ''}
+        </Text>
       </View>
 
     </Card>

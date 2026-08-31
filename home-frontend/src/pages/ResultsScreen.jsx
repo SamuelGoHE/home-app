@@ -10,6 +10,13 @@ function formatCOP(n) {
   return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(n)
 }
 
+const UNIT_LABEL = { por_hora: 'hora', por_dia: 'día', por_m2: 'm²', por_proyecto: 'proyecto' }
+
+function rateLabel(rate) {
+  if (!rate || rate.price_unit === 'a_convenir') return 'Cotiza tras revisar'
+  return `${formatCOP(rate.amount)} / ${UNIT_LABEL[rate.price_unit] || rate.price_unit}`
+}
+
 export default function ResultsScreen() {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -97,6 +104,7 @@ export default function ResultsScreen() {
         ) : (
           workers.map(w => {
             const profile = w.workerProfile || {}
+            const rate = w.serviceRates?.[0]
             return (
               <Card
                 padding="sm"
@@ -150,6 +158,10 @@ export default function ResultsScreen() {
                         ({w.rating_count ?? 0})
                       </span>
                     </div>
+                  </div>
+                  <div className="mt-2 text-[12px] font-extrabold text-brand">
+                    {rateLabel(rate)}
+                    {rate?.includes_materials && <span className="ml-1.5 text-gray-400 font-semibold">Incluye materiales</span>}
                   </div>
                 </div>
                 <button

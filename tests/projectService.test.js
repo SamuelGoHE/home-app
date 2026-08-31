@@ -1,9 +1,10 @@
 jest.mock('../src/models', () => ({
   Project: { findByPk: jest.fn(), create: jest.fn() },
   Task: { findByPk: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
-  Service: {},
-  User: {},
-  Quote: { findByPk: jest.fn() },
+  Service: { findByPk: jest.fn() },
+  User: { findOne: jest.fn(), findByPk: jest.fn() },
+  Quote: { findByPk: jest.fn(), create: jest.fn() },
+  WorkerServiceRate: { findOne: jest.fn() },
   Payment: { findOne: jest.fn() },
 }));
 
@@ -16,7 +17,7 @@ jest.mock('../src/services/refundService', () => ({
 }));
 
 const svc = require('../src/services/projectService');
-const { Project, Task, Quote, Payment } = require('../src/models');
+const { Project, Task, Service, User, Quote, WorkerServiceRate, Payment } = require('../src/models');
 const refundService = require('../src/services/refundService');
 
 describe('projectService permission checks', () => {
@@ -153,5 +154,53 @@ describe('projectService.updateProjectStatus — cancelación y reembolsos', () 
     await svc.updateProjectStatus('p1', 'cancelado', { id: 'c1', role: 'cliente' }, bankDetails);
 
     expect(refundService.createRefundRequest).toHaveBeenCalledWith(project, approvedPayment, bankDetails);
+  });
+});
+
+describe('projectService.createQuote — precio tomado de la tarifa publicada', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    Service.findByPk.mockResolvedValue({ id: 'srv-1', name: 'Pintura', category: 'pintura' });
+    User.findOne.mockResolvedValue({ id: 'w-1', role: 'trabajador' });
+    User.findByPk.mockResolvedValue({ id: 'c-1', name: 'Cliente' });
+    Quote.create.mockImplementation(async (payload) => ({ id: 'q-1', ...payload }));
+  });
+
+  const baseData = { service_id: 'srv-1', worker_id: 'w-1', city: 'Medellin', address: 'Calle 1' };
+
+  test('rechaza la solicitud si el trabajador no publicó precio para la categoría', async () => {
+    WorkerServiceRate.findOne.mockResolvedValue(null);
+
+    await expect(svc.createQuote(baseData, 'c-1'))
+      .rejects.toMatchObject({ statusCode: 400, message: 'Este trabajador no tiene un precio publicado para este servicio' });
+  });
+
+  test('por_dia: congela la tarifa como estimated_price y conserva end_date', async () => {
+    WorkerServiceRate.findOne.mockResolvedValue({ id: 'rate-1', price_unit: 'por_dia', amount: '80000.00' });
+
+    const quote = await svc.createQuote({ ...baseData, end_date: '2026-09-10' }, 'c-1');
+
+    expect(quote.pricing_type).toBe('por_dia');
+    expect(quote.estimated_price).toBe(80000);
+    expect(quote.end_date).toBe('2026-09-10');
+    expect(quote.service_rate_id).toBe('rate-1');
+  });
+
+  test('por_m2: multiplica la tarifa por los metros e ignora end_date', async () => {
+    WorkerServiceRate.findOne.mockResolvedValue({ id: 'rate-2', price_unit: 'por_m2', amount: '25000.00' });
+
+    const quote = await svc.createQuote({ ...baseData, sq_meters: 40, end_date: '2026-09-10' }, 'c-1');
+
+    expect(quote.estimated_price).toBe(1000000);
+    expect(quote.end_date).toBeNull();
+  });
+
+  test('a_convenir: deja estimated_price en null pero registra la tarifa usada', async () => {
+    WorkerServiceRate.findOne.mockResolvedValue({ id: 'rate-3', price_unit: 'a_convenir', amount: null });
+
+    const quote = await svc.createQuote(baseData, 'c-1');
+
+    expect(quote.estimated_price).toBeNull();
+    expect(quote.service_rate_id).toBe('rate-3');
   });
 });
