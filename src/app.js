@@ -70,6 +70,11 @@ app.use('/api/ratings', ratingRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/messages', messagesRoutes);
 
+// Manejador de errores de Sentry: va después de las rutas y antes de nuestros
+// manejadores. Captura los errores propagados vía next(err). Inerte sin DSN.
+const Sentry = require('@sentry/node');
+Sentry.setupExpressErrorHandler(app);
+
 app.use(notFound);
 app.use(errorHandler);
 

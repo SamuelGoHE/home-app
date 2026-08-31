@@ -1,6 +1,20 @@
+// Sentry primero de todo, antes de cargar Express/rutas (auto-instrumentación).
+const Sentry = require('./instrument');
+
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
+
+// Red de seguridad final: cualquier promesa rechazada o excepción que se
+// escape de toda la app se reporta antes de que el proceso muera.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+  Sentry.captureException?.(reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  Sentry.captureException?.(err);
+});
 
 // ── Validar variables de entorno críticas antes de iniciar ──────────
 // Si falta alguna el servidor no arranca, evitando fallos silenciosos.
