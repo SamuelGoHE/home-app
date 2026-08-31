@@ -1,9 +1,9 @@
 jest.mock('../src/models', () => ({
-  Project: { findByPk: jest.fn(), create: jest.fn() },
+  Project: { findByPk: jest.fn(), create: jest.fn(), findAll: jest.fn() },
   Task: { findByPk: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
-  Service: { findByPk: jest.fn() },
-  User: { findOne: jest.fn(), findByPk: jest.fn() },
-  Quote: { findByPk: jest.fn(), create: jest.fn() },
+  Service: { findByPk: jest.fn(), findAll: jest.fn() },
+  User: { findOne: jest.fn(), findByPk: jest.fn(), findAll: jest.fn() },
+  Quote: { findByPk: jest.fn(), create: jest.fn(), findAll: jest.fn() },
   WorkerServiceRate: { findOne: jest.fn() },
   Payment: { findOne: jest.fn() },
 }));
@@ -202,5 +202,188 @@ describe('projectService.createQuote — precio tomado de la tarifa publicada', 
 
     expect(quote.estimated_price).toBeNull();
     expect(quote.service_rate_id).toBe('rate-3');
+  });
+});
+
+describe('projectService.getProjects — filtrado por rol', () => {
+  beforeEach(() => { jest.clearAllMocks(); Project.findAll.mockResolvedValue([]); });
+
+  test('un cliente solo ve sus propios proyectos', async () => {
+    await svc.getProjects({ id: 'c-1', role: 'cliente' });
+    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { client_id: 'c-1' } }));
+  });
+
+  test('un trabajador solo ve los proyectos donde está asignado', async () => {
+    await svc.getProjects({ id: 'w-1', role: 'trabajador' });
+    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { worker_id: 'w-1' } }));
+  });
+
+  test('un admin ve todos (sin filtro por usuario)', async () => {
+    await svc.getProjects({ id: 'a-1', role: 'admin' });
+    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+  });
+});
+
+describe('projectService.createProject', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rechaza si el servicio no existe (404)', async () => {
+    Service.findByPk.mockResolvedValue(null);
+    await expect(svc.createProject({ service_id: 's-x', client_id: 'c-1' }, 'a-1'))
+      .rejects.toMatchObject({ statusCode: 404, message: 'Servicio no encontrado' });
+  });
+
+  test('rechaza si el cliente no existe (404)', async () => {
+    Service.findByPk.mockResolvedValue({ id: 's-1' });
+    User.findOne.mockResolvedValue(null);
+    await expect(svc.createProject({ service_id: 's-1', client_id: 'c-x' }, 'a-1'))
+      .rejects.toMatchObject({ statusCode: 404, message: 'Cliente no encontrado' });
+  });
+
+  test('crea el proyecto asignándole el admin que lo genera', async () => {
+    Service.findByPk.mockResolvedValue({ id: 's-1' });
+    User.findOne.mockResolvedValue({ id: 'c-1', role: 'cliente' });
+    Project.create.mockResolvedValue({ id: 'p-1' });
+
+    await svc.createProject({ service_id: 's-1', client_id: 'c-1' }, 'a-1');
+
+    expect(Project.create).toHaveBeenCalledWith(expect.objectContaining({ admin_id: 'a-1', client_id: 'c-1' }));
+  });
+});
+
+describe('projectService.deleteProject', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rechaza si el proyecto no existe (404)', async () => {
+    Project.findByPk.mockResolvedValue(null);
+    await expect(svc.deleteProject('p-x')).rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  test('destruye el proyecto cuando existe', async () => {
+    const destroy = jest.fn().mockResolvedValue();
+    Project.findByPk.mockResolvedValue({ id: 'p-1', destroy });
+    await svc.deleteProject('p-1');
+    expect(destroy).toHaveBeenCalled();
+  });
+});
+
+describe('projectService.createTask', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rechaza si el proyecto no existe (404)', async () => {
+    Project.findByPk.mockResolvedValue(null);
+    await expect(svc.createTask({ project_id: 'p-x' }, 'a-1')).rejects.toMatchObject({ statusCode: 404, message: 'Proyecto no encontrado' });
+  });
+
+  test('rechaza si se asigna a un trabajador inexistente (404)', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p-1' });
+    User.findOne.mockResolvedValue(null);
+    await expect(svc.createTask({ project_id: 'p-1', assigned_to: 'w-x' }, 'a-1'))
+      .rejects.toMatchObject({ statusCode: 404, message: 'Trabajador no encontrado' });
+  });
+
+  test('crea la tarea registrando quién la creó', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p-1' });
+    Task.create.mockResolvedValue({ id: 't-1' });
+    await svc.createTask({ project_id: 'p-1', title: 'Pintar' }, 'a-1');
+    expect(Task.create).toHaveBeenCalledWith(expect.objectContaining({ created_by: 'a-1', title: 'Pintar' }));
+  });
+});
+
+describe('projectService.assignTask', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('rechaza si la tarea no existe (404)', async () => {
+    Task.findByPk.mockResolvedValue(null);
+    await expect(svc.assignTask('t-x', 'w-1')).rejects.toMatchObject({ statusCode: 404, message: 'Tarea no encontrada' });
+  });
+
+  test('rechaza si el trabajador no existe (404)', async () => {
+    Task.findByPk.mockResolvedValue({ id: 't-1', update: jest.fn(), reload: jest.fn() });
+    User.findOne.mockResolvedValue(null);
+    await expect(svc.assignTask('t-1', 'w-x')).rejects.toMatchObject({ statusCode: 404, message: 'Trabajador no encontrado' });
+  });
+
+  test('asigna la tarea y la pone en progreso', async () => {
+    const update = jest.fn().mockResolvedValue();
+    const reload = jest.fn().mockResolvedValue({ id: 't-1' });
+    Task.findByPk.mockResolvedValue({ id: 't-1', update, reload });
+    User.findOne.mockResolvedValue({ id: 'w-1', role: 'trabajador' });
+    await svc.assignTask('t-1', 'w-1');
+    expect(update).toHaveBeenCalledWith({ assigned_to: 'w-1', status: 'en_progreso' });
+  });
+});
+
+describe('projectService.updateProjectStatus — permisos y sincronización de tareas', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('un trabajador no puede enviar a un estado fuera de revisión/completado (400)', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p-1', worker_id: 'w-1' });
+    await expect(svc.updateProjectStatus('p-1', 'cancelado', { id: 'w-1', role: 'trabajador' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  test('un cliente que no es dueño del proyecto no puede modificarlo (403)', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p-1', client_id: 'otro' });
+    await expect(svc.updateProjectStatus('p-1', 'aprobado', { id: 'c-1', role: 'cliente' }))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  test('un rol no autorizado no puede cambiar el estado (403)', async () => {
+    Project.findByPk.mockResolvedValue({ id: 'p-1' });
+    await expect(svc.updateProjectStatus('p-1', 'completado', { id: 'x', role: 'invitado' }))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  test('completar fija actual_end_date y sincroniza las tareas a completada', async () => {
+    const update = jest.fn().mockResolvedValue();
+    const reload = jest.fn().mockResolvedValue({ id: 'p-1', status: 'completado' });
+    Project.findByPk.mockResolvedValue({ id: 'p-1', worker_id: 'w-1', update, reload });
+
+    await svc.updateProjectStatus('p-1', 'completado', { id: 'w-1', role: 'trabajador' });
+
+    expect(update).toHaveBeenCalledWith(expect.objectContaining({ status: 'completado', actual_end_date: expect.any(Date) }));
+    expect(Task.update).toHaveBeenCalledWith({ status: 'completada' }, { where: { project_id: 'p-1' } });
+  });
+});
+
+describe('projectService.updateQuoteStatus — validaciones del trabajador', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  const pendingQuote = (overrides = {}) => ({
+    id: 'q-1', worker_id: 'w-1', client_id: 'c-1', status: 'solicitud_pendiente',
+    estimated_price: 500000, project_id: null,
+    update: jest.fn(), reload: jest.fn().mockResolvedValue({ id: 'q-1' }),
+    ...overrides,
+  });
+
+  test('un trabajador no dueño de la solicitud no puede responderla (403)', async () => {
+    Quote.findByPk.mockResolvedValue(pendingQuote({ worker_id: 'otro' }));
+    await expect(svc.updateQuoteStatus('q-1', 'aceptada', null, { id: 'w-1', role: 'trabajador' }))
+      .rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  test('un trabajador solo puede aceptar o rechazar, no otros estados (400)', async () => {
+    Quote.findByPk.mockResolvedValue(pendingQuote());
+    await expect(svc.updateQuoteStatus('q-1', 'revisada', null, { id: 'w-1', role: 'trabajador' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  test('no se puede responder una solicitud ya respondida (409)', async () => {
+    Quote.findByPk.mockResolvedValue(pendingQuote({ status: 'aceptada' }));
+    await expect(svc.updateQuoteStatus('q-1', 'rechazada', null, { id: 'w-1', role: 'trabajador' }))
+      .rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  test('aceptar sin precio (ni en la solicitud ni en el request) es rechazado (400)', async () => {
+    Quote.findByPk.mockResolvedValue(pendingQuote({ estimated_price: null }));
+    await expect(svc.updateQuoteStatus('q-1', 'aceptada', null, { id: 'w-1', role: 'trabajador' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  test('un rol que no es trabajador ni admin no tiene permiso (403)', async () => {
+    Quote.findByPk.mockResolvedValue(pendingQuote());
+    await expect(svc.updateQuoteStatus('q-1', 'aceptada', null, { id: 'c-1', role: 'cliente' }))
+      .rejects.toMatchObject({ statusCode: 403 });
   });
 });
