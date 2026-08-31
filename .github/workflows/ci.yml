@@ -1,0 +1,46 @@
+name: CI
+
+# Corre en cada push a master y en cada Pull Request, para que ningún cambio
+# que rompa los tests del backend o el build del frontend se integre en silencio.
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+# Cancela ejecuciones anteriores del mismo ref si llega un push nuevo.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Tests (jest + coverage)
+        run: npm test
+
+  frontend:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: home-frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: home-frontend/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Build de producción (vite)
+        run: npm run build
