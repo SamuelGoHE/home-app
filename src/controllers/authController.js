@@ -87,6 +87,18 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// El enlace del correo apunta aquí (GET). Verifica y redirige al frontend
+// con un flag, para mostrar un mensaje amable sin necesitar una página propia.
+const verifyEmail = async (req, res) => {
+  const frontend = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/\/$/, '');
+  try {
+    await authService.verifyEmail(req.query.token);
+    res.redirect(`${frontend}/login?verified=1`);
+  } catch {
+    res.redirect(`${frontend}/login?verified=0`);
+  }
+};
+
 const oauthSignIn = async (req, res) => {
   const { provider, token, profile: fallbackProfile } = req.body;
   if (!provider || !token)
@@ -99,4 +111,4 @@ const oauthSignIn = async (req, res) => {
   }
 };
 
-module.exports = { register, login, refreshToken, logout, getMe, forgotPassword, resetPassword, oauthSignIn };
+module.exports = { register, login, refreshToken, logout, getMe, forgotPassword, resetPassword, verifyEmail, oauthSignIn };

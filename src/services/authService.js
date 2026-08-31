@@ -13,6 +13,7 @@ const {
   verifyRefreshToken,
 } = require('../utils/jwt');
 const { verifyGoogleToken, verifyFacebookToken, verifyAppleToken } = require('../utils/verifyOAuthToken');
+const emailService = require('./emailService');
 
 // ── Register ────────────────────────────────────────────────────────
 
@@ -34,6 +35,10 @@ const register = async ({ name, email, password, phone, role = 'cliente', city }
       cities_covered: city ? [city] : [],
     });
   }
+
+  // Correo de verificación (no bloqueante: si falla el envío, el registro
+  // sigue siendo válido y el usuario puede pedir reenvío después).
+  emailService.sendVerificationEmail(user.email, verificationToken).catch(() => {});
 
   const { accessToken, refreshToken } = generateTokens(user.id, user.role);
   await saveRefreshToken(user.id, refreshToken);
@@ -178,11 +183,25 @@ const forgotPassword = async (email) => {
     reset_password_expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hora
   });
 
+  await emailService.sendPasswordResetEmail(user.email, resetToken);
+
+  // En desarrollo devolvemos también el token para poder probar sin SMTP real.
   if (process.env.NODE_ENV === 'development') {
     return { message: 'Si el correo existe, recibirás instrucciones', resetToken };
   }
-  // TODO: enviar email con resetToken via nodemailer (próximo paso del roadmap)
   return { message: 'Si el correo existe, recibirás instrucciones' };
+};
+
+/**
+ * Verifica el correo de un usuario a partir del token enviado al registrarse.
+ * Idempotente: un token ya consumido simplemente no encuentra usuario.
+ */
+const verifyEmail = async (token) => {
+  if (!token) { const e = new Error('Token requerido'); e.statusCode = 400; throw e; }
+  const user = await User.findOne({ where: { verification_token: token } });
+  if (!user) { const e = new Error('Token inválido o ya utilizado'); e.statusCode = 400; throw e; }
+  await user.update({ is_verified: true, verification_token: null });
+  return { message: 'Correo verificado' };
 };
 
 const resetPassword = async (token, newPassword) => {
@@ -261,5 +280,6 @@ module.exports = {
   logoutAllDevices,
   forgotPassword,
   resetPassword,
+  verifyEmail,
   oauthSignIn,
 };

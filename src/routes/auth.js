@@ -30,6 +30,7 @@ router.post('/reset-password', [
   body('password').isLength({ min: 8 }).withMessage('Mínimo 8 caracteres')
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Debe tener mayúscula, minúscula y número'),
 ], ctrl.resetPassword);
+router.get('/verify-email', ctrl.verifyEmail);
 router.get('/me', authenticate, ctrl.getMe);
 router.post('/logout', authenticate, ctrl.logout);
 
