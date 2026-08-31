@@ -2,23 +2,25 @@
 
 Basado en el estado real del código verificado en esta auditoría (agosto 2026), no en la lista de features documentadas — algunas cosas que suenan implementadas (pagos, verificación de email) no tienen código detrás. Ver [`quality-report.md`](quality-report.md) para el detalle de cada hallazgo referenciado aquí.
 
+> **Actualización 31-ago-2026:** los bloqueantes de *código* están cerrados. Pagos Wompi (checkout + payouts + reembolsos), envío real de emails, verificación de correo y monitoreo con Sentry ya están implementados y con tests. Lo que queda bloqueante es **puramente operativo** (Redis gestionado, secretos de producción, CORS/dominios). Ver el detalle abajo.
+
 ## 🔴 Bloqueante — debe resolverse antes de publicar
 
 Estas son cosas que, si se lanza sin resolverlas, generan un producto roto o inseguro para usuarios reales, no solo "incompleto":
 
-1. **Envío real de emails** (recuperación de contraseña). Hoy el flujo genera el token pero nadie lo recibe fuera de `NODE_ENV=development`. Sin esto, cualquier usuario que olvide su contraseña queda bloqueado permanentemente.
-2. **Redis en producción, real y monitoreado**. El sistema arranca sin él, pero el logout y la revocación de sesiones dejan de funcionar de verdad. No lanzar sin Redis gestionado (Upstash, Redis Cloud, etc.) con alertas si se cae.
-3. **Secretos de producción generados desde cero**. `JWT_SECRET`/`JWT_REFRESH_SECRET` y credenciales OAuth de producción, nunca reusar los valores de desarrollo/`.env.example`.
-4. **Decisión y configuración de Wompi**, si el modelo de negocio depende de cobrar dentro de la app: hoy no hay ningún código de pagos, solo variables de entorno sin usar. O se implementa el flujo completo (checkout + webhook de confirmación + estado de pago en `Project`/`Quote`), o se retira temporalmente la promesa de pagos in-app del producto.
-5. **Monitoreo de errores en producción** (Sentry o equivalente, al menos en el backend). Sin esto, un fallo en producción solo se detecta cuando un usuario se queja.
-6. **CORS y dominios de producción configurados** (`FRONTEND_URL`), y decidir la relación de dominios entre frontend y backend (ver [`deployment.md`](deployment.md)) antes de desplegar en hosts separados.
+1. ✅ **Envío real de emails** (recuperación de contraseña). Implementado en `emailService.js` (nodemailer) con degradación elegante sin SMTP. Falta solo configurar credenciales SMTP reales en producción.
+2. **Redis en producción, real y monitoreado**. El sistema arranca sin él, pero el logout y la revocación de sesiones dejan de funcionar de verdad. No lanzar sin Redis gestionado (Upstash, Redis Cloud, etc.) con alertas si se cae. — *operativo, pendiente*
+3. **Secretos de producción generados desde cero**. `JWT_SECRET`/`JWT_REFRESH_SECRET` y credenciales OAuth de producción, nunca reusar los valores de desarrollo/`.env.example`. — *operativo, pendiente*
+4. ✅ **Wompi (pagos)**. Flujo completo implementado: pago inicial 20% vía Payment Links, pago final 80%, payouts a trabajadores, reembolsos por cancelación, panel de Finanzas y rol `admin_finanzas`. Falta solo cambiar a llaves de producción.
+5. ✅ **Monitoreo de errores en producción** (Sentry). Implementado en `instrument.js` + `errorHandler` (captura 5xx) + handlers globales. Falta solo configurar `SENTRY_DSN` de producción.
+6. **CORS y dominios de producción configurados** (`FRONTEND_URL`), y decidir la relación de dominios entre frontend y backend (ver [`deployment.md`](deployment.md)) antes de desplegar en hosts separados. — *operativo, pendiente*
 
 ## 🟠 Alta prioridad — funcionalidades esperables para un lanzamiento serio
 
 No rompen el producto si faltan el día 1, pero un usuario las va a extrañar rápido o el equipo las va a necesitar para operar con confianza:
 
-7. **Verificación de email**. El campo y el token ya existen (`is_verified`, `verification_token`) — falta el endpoint que los consuma y el email que lo dispare (depende del punto 1).
-8. **Tests automatizados más allá de 2 servicios**. Backend: cubrir `quoteService`/la lógica de quotes real en `projectService`, `taskService`, `ratingService`, `serviceService`. Frontend y mobile: al menos smoke tests de los flujos críticos (login, crear cotización, chat).
+7. ✅ **Verificación de email**. Implementada: `GET /api/auth/verify-email` consume el `verification_token`, el registro dispara el correo. Marca `is_verified` y redirige al frontend.
+8. **Tests automatizados más allá de 2 servicios**. Backend: buen avance (10 suites, 102 tests — cubren pagos, payouts, reembolsos, createQuote, verifyEmail). Pendiente: `taskService`, `ratingService`, `serviceService`, y subir cobertura de `authService`/`projectService`. Frontend y mobile: aún sin smoke tests de flujos críticos (login, crear cotización, chat).
 9. **CI mínimo** (GitHub Actions): correr tests + build en cada PR, antes de que el equipo crezca y los merges rotos empiecen a colarse.
 10. **Paginación** en listados que van a crecer sin límite (`/api/projects`, `/api/quotes`, `/api/users`, `/api/ratings`, `/api/users/workers`).
 11. **Rate limiting específico por usuario** en creación de recursos (cotizaciones, ratings, proyectos), no solo por IP.
