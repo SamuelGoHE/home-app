@@ -24,7 +24,7 @@ No rompen el producto si faltan el día 1, pero un usuario las va a extrañar r�
 9. **CI mínimo** (GitHub Actions): correr tests + build en cada PR, antes de que el equipo crezca y los merges rotos empiecen a colarse.
 10. **Paginación** en listados que van a crecer sin límite (`/api/projects`, `/api/quotes`, `/api/users`, `/api/ratings`, `/api/users/workers`). — *Backend ✅ (rama `feat/pagination`)*: helper reutilizable `utils/pagination.js`, respuesta retrocompatible (`data` array + campo hermano `pagination: { page, pageSize, total, totalPages, hasNext, hasPrev }`), `pageSize` por defecto 20 (máx 100). Verificado read-only contra la DB. **Consumidores ✅:** mobile — scroll infinito real en la búsqueda de trabajadores (hook `useInfiniteFetch` + `FlatList onEndReached` en `ResultsScreen`); el resto de listas mobile/web que combinan fuentes o calculan stats/filtros client-side (Proyectos, dashboards worker/admin) piden un page grande acotado (`pageSize:100`) para preservar la UX y las estadísticas sin fetch ilimitado. **Pendiente (futuro, no beta):** cuando alguna lista supere ~100 filas, migrar el panel admin a controles de página server-side con stats por conteo.
 11. ✅ **Rate limiting específico por usuario** en creación de recursos (cotizaciones, ratings, proyectos), no solo por IP. Fábrica `createPerUserLimiter` en `middlewares/rateLimiter.js` (clave = `req.user.id`, fallback IP), montada tras `authenticate` en `POST /api/quotes` (30/h), `POST /api/ratings` (20/h) y `POST /api/projects` (30/h). Topes relajados en dev/test. Cubierto con tests de integración (supertest): 429 al superar el máximo y contadores independientes por usuario.
-12. **Limpiar el código muerto** (`quoteService.js`, exports sin usar de `services/index.js` en ambos clientes, dependencias sin usar) — antes de que un desarrollador nuevo pierda tiempo entendiendo lógica que no corre.
+12. **Limpiar el código muerto** — *En progreso ✅*: `quoteService.js` ya no existía; eliminados los exports muertos `serviceApi/workerApi/quoteApi/projectApi` de `home-frontend/src/services/index.js` (mobile ya estaba limpio); `activate_users.js` movido a `scripts/`. **Pendiente:** revisar dependencias sin usar (`multer`, `@supabase/ssr` en backend; varias en mobile) y las rutas/funciones duplicadas de `projectService`/`projectRoutes` (eso es el #13).
 13. **Resolver la duplicación quotes/services/tasks** entre `projectService` y los servicios dedicados — es la deuda técnica con más riesgo de causar un bug real si alguien edita el archivo equivocado.
 
 ## 🟡 Media prioridad — mejora la calidad pero no bloquea el lanzamiento
@@ -39,8 +39,8 @@ No rompen el producto si faltan el día 1, pero un usuario las va a extrañar r�
 
 19. Convención de nombres consistente en `home-mobile/src/screens/` (cosmético, no afecta funcionamiento).
 20. `.gitattributes` (ya agregado en esta sesión) y `.gitignore` de IDEs (`.vscode/`, `.idea/`).
-21. Mover `activate_users.js` a una carpeta `scripts/` documentada, o retirarlo si ya no se usa.
-22. Revisar si `GET /api/workers` (sin consumidores hoy) se puede eliminar a favor de `GET /api/users/workers`.
+21. ✅ Movido `activate_users.js` → `scripts/activate-users.js` con encabezado documentado.
+22. Revisar si `GET /api/workers` se puede eliminar a favor de `GET /api/users/workers`. **Ojo:** el reporte lo daba "sin consumidores", pero `AdminDashboard` (web) **sí** lo consume (`api.get('/workers')`) — no es código muerto todavía; requiere migrar ese consumidor antes de eliminarlo. Es parte del refactor #13.
 23. Explorar reemplazar el fetching manual de `useApi.js` por una librería de cache de datos (React Query/SWR) si el volumen de pantallas sigue creciendo — hoy cada hook gestiona su propio estado sin compartir cache.
 
 ## Qué SÍ está listo hoy

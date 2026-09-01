@@ -83,6 +83,6 @@ npm run db:seed:services       # seed específico del catálogo de servicios
 
 `src/db/stamp-existing-db.sql` existe para marcar como "ya aplicadas" las migraciones en una base de datos que ya tenía el schema creado manualmente (típico de cuando se conecta por primera vez a un proyecto de Supabase existente).
 
-## Script suelto: `activate_users.js`
+## Script administrativo: `scripts/activate-users.js`
 
-En la raíz del repo (fuera de `src/`) hay un script standalone, `activate_users.js`, que activa (`is_active = true`) a todos los usuarios de la base de datos. No está registrado en `package.json` ni documentado — se ejecuta manualmente con `node activate_users.js`. Es una utilidad administrativa puntual, no parte del flujo normal de la app (ver nota en [`quality-report.md`](quality-report.md)).
+Utilidad standalone, fuera de `src/`, que activa (`is_active = true`) a todos los usuarios de la base de datos. Es una operación administrativa puntual, no parte del flujo normal de la app. Se ejecuta manualmente con `node scripts/activate-users.js` y lleva un encabezado que documenta cuándo usarla y su alcance (afecta a todos los usuarios de golpe).
