@@ -4,6 +4,7 @@ const { validationResult } = require('express-validator');
 const ratingService = require('../services/ratingService');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { parsePagination, buildMeta } = require('../utils/pagination');
+const { createRatingLimiter } = require('../middlewares/rateLimiter');
 
 const router = Router();
 router.use(authenticate);
@@ -24,8 +25,8 @@ router.get('/my', authenticate, async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 
-// POST /api/ratings — cliente crea calificación
-router.post('/', authorize('cliente'), [
+// POST /api/ratings — cliente crea calificación (rate limit por usuario)
+router.post('/', authorize('cliente'), createRatingLimiter, [
     body('score').isInt({ min: 1, max: 5 }).withMessage('Score debe ser entre 1 y 5'),
     body('worker_id').isUUID().withMessage('ID de trabajador inválido'),
     body('project_id').isUUID().withMessage('ID de proyecto inválido'),

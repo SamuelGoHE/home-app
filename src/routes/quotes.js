@@ -2,12 +2,13 @@ const express = require('express');
 const router = express.Router();
 const quoteController = require('../controllers/quoteController');
 const { authenticate, authorize } = require('../middlewares/auth');
+const { createQuoteLimiter } = require('../middlewares/rateLimiter');
 
 // Las rutas de cotizaciones requieren autenticación
 router.use(authenticate);
 
-// POST /api/quotes
-router.post('/', quoteController.createQuote);
+// POST /api/quotes — rate limit por usuario (evita spam de solicitudes)
+router.post('/', createQuoteLimiter, quoteController.createQuote);
 
 // GET /api/quotes/me
 router.get('/me', quoteController.getMyQuotes);

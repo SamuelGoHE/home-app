@@ -4,6 +4,7 @@ const ctrl = require('../controllers/projectController');
 const photoCtrl = require('../controllers/projectPhotoController');
 const { authenticate, authorize } = require('../middlewares/auth');
 const { singlePhoto } = require('../middlewares/upload');
+const { createProjectLimiter } = require('../middlewares/rateLimiter');
 
 const router = Router();
 router.use(authenticate);
@@ -22,7 +23,7 @@ router.get('/workers', ctrl.getWorkers);
 // ── Proyectos ──────────────────────────────────────────────
 router.get('/projects', ctrl.getProjects);
 router.get('/projects/:id', ctrl.getProject);
-router.post('/projects', authorize('admin'), [
+router.post('/projects', authorize('admin'), createProjectLimiter, [
   body('title').notEmpty().withMessage('Título requerido'),
   body('city').notEmpty().withMessage('Ciudad requerida'),
   body('address').notEmpty().withMessage('Dirección requerida'),
