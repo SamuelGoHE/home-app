@@ -117,7 +117,9 @@ export default function ResultsScreen({ route, navigation }) {
   const [filterCity, setFilterCity] = useState(initCity);
   const [showFilter, setShowFilter] = useState(false);
 
-  const { data: workers, loading, error, refetch } = useWorkers(filterCity, serviceCategory);
+  const {
+    data: workers, pagination, loading, loadingMore, error, hasMore, loadMore, refetch,
+  } = useWorkers(filterCity, serviceCategory);
 
   const handleSelectCity = (city) => {
     setFilterCity(city);
@@ -161,13 +163,24 @@ export default function ResultsScreen({ route, navigation }) {
     </Card>
   );
 
-  const ListHeader = () => (
-    <Text className="text-sm text-gray-500 font-medium mb-3">
-      {loading
-        ? 'Buscando trabajadores...'
-        : `${workers?.length || 0} trabajadores disponibles${filterCity ? ` en ${filterCity}` : ''}`}
-    </Text>
-  );
+  const ListHeader = () => {
+    const total = pagination?.total ?? workers?.length ?? 0;
+    return (
+      <Text className="text-sm text-gray-500 font-medium mb-3">
+        {loading
+          ? 'Buscando trabajadores...'
+          : `${total} ${total === 1 ? 'trabajador disponible' : 'trabajadores disponibles'}${filterCity ? ` en ${filterCity}` : ''}`}
+      </Text>
+    );
+  };
+
+  /* ── Footer: spinner mientras carga la siguiente página ── */
+  const ListFooter = () =>
+    loadingMore ? (
+      <View className="py-4 items-center">
+        <ActivityIndicator size="small" color={ICON.brand} />
+      </View>
+    ) : null;
 
   return (
     <SafeAreaView className="flex-1 bg-gray-50">
@@ -211,6 +224,9 @@ export default function ResultsScreen({ route, navigation }) {
           renderItem={renderItem}
           ListHeaderComponent={<ListHeader />}
           ListEmptyComponent={<ListEmpty />}
+          ListFooterComponent={<ListFooter />}
+          onEndReached={hasMore ? loadMore : null}
+          onEndReachedThreshold={0.5}
           contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
         />

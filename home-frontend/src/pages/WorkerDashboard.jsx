@@ -377,9 +377,11 @@ export default function WorkerDashboard() {
   const loadData = async () => {
     setLoading(true)
     try {
+      // Page grande acotado: se filtran/listan client-side (ver AdminDashboard).
+      const PAGE = { params: { pageSize: 100 } }
       const [rRes, pRes] = await Promise.all([
-        api.get('/quotes/worker'),
-        api.get('/projects')
+        api.get('/quotes/worker', PAGE),
+        api.get('/projects', PAGE)
       ])
       setRequests(rRes.data.data?.filter(q => q.status === 'solicitud_pendiente') || [])
       setProjects(pRes.data.data || [])
@@ -388,7 +390,7 @@ export default function WorkerDashboard() {
   }
 
   const loadRequests = async () => {
-    const res = await api.get('/quotes/worker')
+    const res = await api.get('/quotes/worker', { params: { pageSize: 100 } })
     setRequests(res.data.data?.filter(q => q.status === 'solicitud_pendiente') || [])
   }
 

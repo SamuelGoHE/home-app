@@ -695,13 +695,18 @@ export default function AdminDashboard() {
 
   const loadData = async () => {
     try {
+      // El panel calcula estadísticas y filtros client-side sobre estos arrays,
+      // así que pedimos un page grande (acotado por el máximo del backend) en vez
+      // de la primera página de 20. Cuando el volumen supere ~100 filas habrá que
+      // migrar a controles de página server-side y stats por conteo (ver roadmap #10).
+      const PAGE = { params: { pageSize: 100 } }
       const [pRes, qRes, wRes, uRes, sRes, rRes] = await Promise.all([
-        api.get('/projects'),
-        api.get('/quotes'),
+        api.get('/projects', PAGE),
+        api.get('/quotes', PAGE),
         api.get('/workers'),
-        api.get('/users').catch(() => ({ data: { data: [] } })),
+        api.get('/users', PAGE).catch(() => ({ data: { data: [] } })),
         api.get('/services'),
-        api.get('/ratings').catch(() => ({ data: { data: [] } })),
+        api.get('/ratings', PAGE).catch(() => ({ data: { data: [] } })),
       ])
       setProjects(pRes.data.data || [])
       setQuotes(qRes.data.data || [])

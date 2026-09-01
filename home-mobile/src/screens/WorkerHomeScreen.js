@@ -259,7 +259,9 @@ export default function WorkerHomeScreen({ navigation }) {
 
   const fetchRequests = useCallback(async () => {
     try {
-      const res = await api.get('/quotes/worker');
+      // Page grande acotado: el dashboard filtra las pendientes client-side, así
+      // que traemos suficientes para no perder solicitudes más allá de la 1ª página.
+      const res = await api.get('/quotes/worker', { params: { pageSize: 100 } });
       setRequests((res.data.data || []).filter(q => q.status === 'solicitud_pendiente'));
       setReqError(null);
     } catch (err) {
