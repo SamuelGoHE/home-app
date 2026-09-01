@@ -1,5 +1,5 @@
 jest.mock('../src/models', () => ({
-  Rating: { findAll: jest.fn(), findOne: jest.fn(), create: jest.fn() },
+  Rating: { findAll: jest.fn(), findOne: jest.fn(), create: jest.fn(), findAndCountAll: jest.fn() },
   User: { findOne: jest.fn(), findByPk: jest.fn() },
   Project: { findByPk: jest.fn() },
   Service: {},
@@ -58,6 +58,21 @@ describe('ratingService.getRecentRatings', () => {
     const result = await ratingService.getRecentRatings('client-1');
 
     expect(result).toBe(ratings);
+  });
+});
+
+describe('ratingService.getAllRatings — paginado', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  test('propaga limit/offset con distinct y devuelve { rows, count }', async () => {
+    Rating.findAndCountAll.mockResolvedValue({ rows: [{ id: 'r1' }], count: 7 });
+
+    const result = await ratingService.getAllRatings({ limit: 20, offset: 0 });
+
+    expect(Rating.findAndCountAll).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 20, offset: 0, distinct: true })
+    );
+    expect(result).toEqual({ rows: [{ id: 'r1' }], count: 7 });
   });
 });
 

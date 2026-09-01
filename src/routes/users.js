@@ -8,6 +8,7 @@ const { singlePhoto } = require('../middlewares/upload');
 const { uploadAvatar } = require('../utils/storage');
 const portfolioService = require('../services/workerPortfolioService');
 const payoutAccountService = require('../services/payoutAccountService');
+const { parsePagination, buildMeta } = require('../utils/pagination');
 const router = express.Router();
 
 // Obtener un usuario por email (solo admin)
@@ -73,17 +74,28 @@ router.get('/workers', authenticate, async (req, res, next) => {
       });
     }
 
-    const workers = await User.findAll({
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const queryOptions = {
       where: whereClause,
       include: workerIncludes,
       attributes: ['id', 'name', 'email', 'avatar', 'role', 'is_active', 'city'],
+      // distinct hace que el COUNT cuente trabajadores únicos y no filas del JOIN.
       distinct: true,
       // Con un oficio seleccionado, comparar por precio primero hace la lista
       // útil desde la primera pantalla. Los valores a convenir (null) quedan al final.
       order: specialty
         ? [[{ model: WorkerServiceRate, as: 'serviceRates' }, 'amount', 'ASC NULLS LAST'], ['name', 'ASC']]
         : [['name', 'ASC']],
-    });
+      limit,
+      offset,
+    };
+    // Con especialidad el JOIN a serviceRates es `required` (≈1 fila por trabajador),
+    // así que un JOIN plano (subQuery:false) permite ordenar por `amount` de forma
+    // confiable sin truncar. Sin especialidad se deja el subquery por defecto de
+    // Sequelize para que el LIMIT recorte trabajadores enteros y no filas del LEFT JOIN
+    // (forzar subQuery aquí rompe: true da error de GROUP BY, false trunca de más).
+    if (specialty) queryOptions.subQuery = false;
+    const { rows: workers, count } = await User.findAndCountAll(queryOptions);
 
     // Enriquecer con calificaciones reales
     const workerIds = workers.map(w => w.id);
@@ -112,7 +124,7 @@ router.get('/workers', authenticate, async (req, res, next) => {
       rating_count: ratingMap[w.id]?.rating_count ?? 0
     }));
 
-    res.json({ success: true, data: enriched });
+    res.json({ success: true, data: enriched, pagination: buildMeta({ total: count, page, pageSize }) });
   } catch (error) {
     next(error);
   }
@@ -436,11 +448,14 @@ router.patch('/me/password', authenticate, async (req, res, next) => {
 // ── GET /users — lista todos los usuarios (solo admin) ──
 router.get('/', authenticate, authorize('admin'), async (req, res, next) => {
   try {
-    const users = await User.findAll({
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await User.findAndCountAll({
       attributes: ['id','name','email','role','city','is_active','rating_avg','rating_count','createdAt'],
       order: [['createdAt', 'DESC']],
+      limit,
+      offset,
     });
-    res.json({ success: true, data: users });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
   } catch (error) { next(error); }
 });
 

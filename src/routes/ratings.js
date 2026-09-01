@@ -3,6 +3,7 @@ const { body } = require('express-validator');
 const { validationResult } = require('express-validator');
 const ratingService = require('../services/ratingService');
 const { authenticate, authorize } = require('../middlewares/auth');
+const { parsePagination, buildMeta } = require('../utils/pagination');
 
 const router = Router();
 router.use(authenticate);
@@ -66,8 +67,9 @@ router.get('/can-rate/:projectId', authorize('cliente'), async (req, res) => {
 // GET /api/ratings — todas (admin)
 router.get('/', authorize('admin'), async (req, res) => {
     try {
-        const ratings = await ratingService.getAllRatings();
-        res.json({ success: true, data: ratings });
+        const { page, pageSize, limit, offset } = parsePagination(req.query);
+        const { rows, count } = await ratingService.getAllRatings({ limit, offset });
+        res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
     } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 });
 

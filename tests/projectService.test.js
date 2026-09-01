@@ -1,5 +1,5 @@
 jest.mock('../src/models', () => ({
-  Project: { findByPk: jest.fn(), create: jest.fn(), findAll: jest.fn() },
+  Project: { findByPk: jest.fn(), create: jest.fn(), findAll: jest.fn(), findAndCountAll: jest.fn() },
   Task: { findByPk: jest.fn(), count: jest.fn(), create: jest.fn(), update: jest.fn() },
   Service: { findByPk: jest.fn(), findAll: jest.fn() },
   User: { findOne: jest.fn(), findByPk: jest.fn(), findAll: jest.fn() },
@@ -206,21 +206,28 @@ describe('projectService.createQuote — precio tomado de la tarifa publicada', 
 });
 
 describe('projectService.getProjects — filtrado por rol', () => {
-  beforeEach(() => { jest.clearAllMocks(); Project.findAll.mockResolvedValue([]); });
+  beforeEach(() => { jest.clearAllMocks(); Project.findAndCountAll.mockResolvedValue({ rows: [], count: 0 }); });
 
   test('un cliente solo ve sus propios proyectos', async () => {
     await svc.getProjects({ id: 'c-1', role: 'cliente' });
-    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { client_id: 'c-1' } }));
+    expect(Project.findAndCountAll).toHaveBeenCalledWith(expect.objectContaining({ where: { client_id: 'c-1' } }));
   });
 
   test('un trabajador solo ve los proyectos donde está asignado', async () => {
     await svc.getProjects({ id: 'w-1', role: 'trabajador' });
-    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: { worker_id: 'w-1' } }));
+    expect(Project.findAndCountAll).toHaveBeenCalledWith(expect.objectContaining({ where: { worker_id: 'w-1' } }));
   });
 
   test('un admin ve todos (sin filtro por usuario)', async () => {
     await svc.getProjects({ id: 'a-1', role: 'admin' });
-    expect(Project.findAll).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+    expect(Project.findAndCountAll).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+  });
+
+  test('propaga limit/offset y devuelve { rows, count }', async () => {
+    Project.findAndCountAll.mockResolvedValue({ rows: [{ id: 'p-1' }], count: 42 });
+    const result = await svc.getProjects({ id: 'a-1', role: 'admin' }, { limit: 20, offset: 40 });
+    expect(Project.findAndCountAll).toHaveBeenCalledWith(expect.objectContaining({ limit: 20, offset: 40, distinct: true }));
+    expect(result).toEqual({ rows: [{ id: 'p-1' }], count: 42 });
   });
 });
 

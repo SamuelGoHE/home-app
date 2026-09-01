@@ -18,14 +18,14 @@ const getServiceById = async (id) => {
 const createService = async (data) => Service.create(data);
 
 // ── PROYECTOS ──────────────────────────────────────────────
-const getProjects = async (user) => {
+const getProjects = async (user, { limit, offset } = {}) => {
   const where = {};
   if (user.role === 'cliente') {
     where.client_id = user.id;
   } else if (user.role === 'trabajador') {
     where.worker_id = user.id;
   }
-  return Project.findAll({
+  return Project.findAndCountAll({
     where,
     include: [
       { model: User, as: 'client',  attributes: ['id','name','email','phone','avatar'] },
@@ -36,6 +36,10 @@ const getProjects = async (user) => {
         include: [{ model: User, as: 'assignee', attributes: ['id','name','avatar'] }] },
     ],
     order: [['created_at', 'DESC']],
+    // distinct evita que el JOIN con `tasks` (hasMany) infle el conteo.
+    distinct: true,
+    limit,
+    offset,
   });
 };
 
@@ -251,8 +255,8 @@ const createQuote = async (data, clientId, io) => {
 /**
  * Obtiene las solicitudes enviadas por un cliente.
  */
-const getMyQuotes = async (clientId) => {
-  return Quote.findAll({
+const getMyQuotes = async (clientId, { limit, offset } = {}) => {
+  return Quote.findAndCountAll({
     where: { client_id: clientId },
     include: [
       { model: Service, as: 'service', attributes: ['id','name','category','image_url'] },
@@ -260,14 +264,17 @@ const getMyQuotes = async (clientId) => {
       { model: Project, as: 'project', attributes: ['id','title','status'] },
     ],
     order: [['created_at', 'DESC']],
+    distinct: true,
+    limit,
+    offset,
   });
 };
 
 /**
  * Obtiene las solicitudes recibidas por un trabajador.
  */
-const getWorkerQuotes = async (workerId) => {
-  return Quote.findAll({
+const getWorkerQuotes = async (workerId, { limit, offset } = {}) => {
+  return Quote.findAndCountAll({
     where: {
       worker_id: workerId,
       status: { [Op.in]: ['solicitud_pendiente', 'aceptada', 'rechazada'] },
@@ -278,11 +285,14 @@ const getWorkerQuotes = async (workerId) => {
       { model: Project, as: 'project', attributes: ['id','title','status'] },
     ],
     order: [['created_at', 'DESC']],
+    distinct: true,
+    limit,
+    offset,
   });
 };
 
-const getAllQuotes = async () => {
-  return Quote.findAll({
+const getAllQuotes = async ({ limit, offset } = {}) => {
+  return Quote.findAndCountAll({
     include: [
       { model: User, as: 'client',  attributes: ['id','name','email','phone'] },
       { model: Service, as: 'service', attributes: ['id','name','category'] },
@@ -290,6 +300,9 @@ const getAllQuotes = async () => {
       { model: Project, as: 'project', attributes: ['id','title','status'] },
     ],
     order: [['created_at', 'DESC']],
+    distinct: true,
+    limit,
+    offset,
   });
 };
 

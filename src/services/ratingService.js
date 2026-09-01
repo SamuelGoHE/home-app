@@ -91,14 +91,17 @@ const getRecentRatings = async (reviewerId, limit = 6) => {
 };
 
 // Obtener todas las calificaciones (admin)
-const getAllRatings = async () => {
-    return Rating.findAll({
+const getAllRatings = async ({ limit, offset } = {}) => {
+    return Rating.findAndCountAll({
         include: [
             { model: User, as: 'reviewer', attributes: ['id', 'name'] },
             { model: User, as: 'worker', attributes: ['id', 'name'] },
             { model: Project, as: 'project', attributes: ['id', 'title'] },
         ],
         order: [['createdAt', 'DESC']],
+        distinct: true,
+        limit,
+        offset,
     });
 };
 

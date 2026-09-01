@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const svc = require('../services/projectService');
+const { parsePagination, buildMeta } = require('../utils/pagination');
 
 // ── Servicios ──────────────────────────────────────────────
 const getServices   = async (req, res) => { try { res.json({ success: true, data: await svc.getServices(req.query.category) }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
@@ -13,7 +14,13 @@ const createService = async (req, res) => {
 };
 
 // ── Proyectos ──────────────────────────────────────────────
-const getProjects   = async (req, res) => { try { res.json({ success: true, data: await svc.getProjects(req.user) }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
+const getProjects   = async (req, res) => {
+  try {
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await svc.getProjects(req.user, { limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
 const getProject    = async (req, res) => { try { res.json({ success: true, data: await svc.getProjectById(req.params.id, req.user) }); } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); } };
 const createProject = async (req, res) => {
   try {
@@ -60,9 +67,27 @@ const createQuote  = async (req, res) => {
   } catch (e) { res.status(e.statusCode||500).json({ success: false, message: e.message }); }
 };
 
-const getMyQuotes      = async (req, res) => { try { res.json({ success: true, data: await svc.getMyQuotes(req.user.id) }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
-const getWorkerQuotes  = async (req, res) => { try { res.json({ success: true, data: await svc.getWorkerQuotes(req.user.id) }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
-const getAllQuotes      = async (req, res) => { try { res.json({ success: true, data: await svc.getAllQuotes() }); } catch (e) { res.status(500).json({ success: false, message: e.message }); } };
+const getMyQuotes      = async (req, res) => {
+  try {
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await svc.getMyQuotes(req.user.id, { limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+const getWorkerQuotes  = async (req, res) => {
+  try {
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await svc.getWorkerQuotes(req.user.id, { limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+const getAllQuotes      = async (req, res) => {
+  try {
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await svc.getAllQuotes({ limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
 
 const updateQuoteStatus = async (req, res) => {
   try {
