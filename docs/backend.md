@@ -53,7 +53,7 @@ Rate limits específicos adicionales (`src/middlewares/rateLimiter.js`), aplicad
 | `PATCH /api/tasks/:id` | `tasks.js` → `taskController` → `taskService.js` | `projectService.updateTask` para ese verbo/ruta específico (aunque el código es casi idéntico al de `taskService`, mantenido por separado) |
 | `POST /api/services`, `POST /api/tasks`, `PATCH /api/tasks/:id/assign`, todo `/api/projects*`, `GET /api/users/... ` no, `GET /api/workers` (nota: hay dos endpoints de workers, ver abajo) | **Sí se ejecutan** vía `projectController` → `projectService` — no tienen competencia porque `quotes.js`/`services.js`/`tasks.js` no definen esos verbos/rutas | — |
 
-Esto **no es un bug de comportamiento** hoy (todo lo que probamos en producción responde correctamente), pero es deuda técnica real: un archivo completo (`quoteService.js`) no hace nada, y la lógica de tareas está duplicada en dos sitios que pueden divergir silenciosamente si alguien edita solo uno. Detalle y recomendación en [`quality-report.md`](quality-report.md).
+**Resuelto (sep-2026):** se eliminaron de `projectRoutes`/`projectController`/`projectService` las rutas y funciones shadoweadas (GET `/services*`, PATCH `/tasks/:id`, todo `/quotes*`); los routers dedicados quedan como únicos dueños. `quoteController` es ahora el único que sirve `/quotes*`, consumiendo `projectService`. `quoteService.js` ya se había eliminado. La tabla de arriba queda como referencia histórica del problema.
 
 ### Dos endpoints distintos para "lista de trabajadores"
 

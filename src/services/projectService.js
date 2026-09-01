@@ -3,18 +3,8 @@ const { Project, Task, Service, User, Quote, WorkerProfile, WorkerServiceRate, R
 const refundService = require('./refundService');
 
 // ── SERVICIOS ──────────────────────────────────────────────
-const getServices = async (category) => {
-  const where = { is_active: true };
-  if (category) where.category = category;
-  return Service.findAll({ where, order: [['name', 'ASC']] });
-};
-
-const getServiceById = async (id) => {
-  const s = await Service.findByPk(id);
-  if (!s) { const e = new Error('Servicio no encontrado'); e.statusCode = 404; throw e; }
-  return s;
-};
-
+// El catálogo de lectura (getAllServices / getServiceById) vive en serviceService,
+// que sirve GET /api/services. Aquí solo queda la creación, usada por POST /services.
 const createService = async (data) => Service.create(data);
 
 // ── PROYECTOS ──────────────────────────────────────────────
@@ -151,28 +141,8 @@ const createTask = async (data, createdById) => {
   return Task.create({ ...data, created_by: createdById });
 };
 
-const updateTask = async (taskId, data, user) => {
-  const task = await Task.findByPk(taskId, { include: [{ model: Project, as: 'project' }] });
-  if (!task) { const e = new Error('Tarea no encontrada'); e.statusCode = 404; throw e; }
-  if (user.role === 'trabajador') {
-    if (task.assigned_to !== user.id) { const e = new Error('Sin acceso a esta tarea'); e.statusCode = 403; throw e; }
-    const allowed = ['status','notes','actual_hours','evidence_urls'];
-    Object.keys(data).forEach(k => { if (!allowed.includes(k)) delete data[k]; });
-  } else if (user.role === 'cliente') {
-    if (task.project?.client_id !== user.id) { const e = new Error('Sin acceso a esta tarea'); e.statusCode = 403; throw e; }
-    // Cliente puede cambiar estado (ej: aprobar/completar) y notas
-    const allowed = ['status','notes'];
-    Object.keys(data).forEach(k => { if (!allowed.includes(k)) delete data[k]; });
-  } else if (user.role !== 'admin') {
-    const e = new Error('Sin acceso a esta tarea'); e.statusCode = 403; throw e;
-  }
-  if (data.status === 'completada') data.completed_at = new Date();
-  await task.update(data);
-  // Auto-completar proyecto si todas las tareas están listas
-  const pending = await Task.count({ where: { project_id: task.project_id, status: { [Op.ne]: 'completada' } } });
-  if (pending === 0) await task.project.update({ status: 'completado', actual_end_date: new Date() });
-  return task.reload({ include: [{ model: User, as: 'assignee', attributes: ['id','name','avatar'] }] });
-};
+// La actualización de tareas (PATCH /api/tasks/:id) la sirve taskService.updateTaskStatus
+// (routes/tasks.js). El duplicado que vivía aquí nunca se ejecutaba y se removió.
 
 const assignTask = async (taskId, workerId) => {
   const task = await Task.findByPk(taskId);
@@ -439,9 +409,9 @@ const getWorkers = async (city) => {
 };
 
 module.exports = {
-  getServices, getServiceById, createService,
+  createService,
   getProjects, getProjectById, createProject, updateProjectStatus, deleteProject,
-  createTask, updateTask, assignTask,
+  createTask, assignTask,
   createQuote, getMyQuotes, getWorkerQuotes, getAllQuotes, updateQuoteStatus,
   getWorkers,
 };

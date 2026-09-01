@@ -34,20 +34,6 @@ describe('projectService permission checks', () => {
     ).rejects.toMatchObject({ statusCode: 403, message: 'Sin acceso a este proyecto' });
   });
 
-  test('denies task updates for non-admin non-worker users', async () => {
-    Task.findByPk.mockResolvedValue({
-      id: 'task-1',
-      assigned_to: 'worker-1',
-      project_id: 'project-1',
-      update: jest.fn(),
-      reload: jest.fn(),
-      project: { update: jest.fn() },
-    });
-
-    await expect(
-      svc.updateTask('task-1', { status: 'en_progreso' }, { id: 'client-1', role: 'cliente' })
-    ).rejects.toMatchObject({ statusCode: 403, message: 'Sin acceso a esta tarea' });
-  });
 
   test('approving quote creates a project and initial task', async () => {
     const quoteUpdate = jest.fn();

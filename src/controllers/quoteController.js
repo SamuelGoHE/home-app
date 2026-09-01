@@ -1,4 +1,5 @@
 const projectService = require('../services/projectService');
+const { parsePagination, buildMeta } = require('../utils/pagination');
 
 const createQuote = async (req, res, next) => {
   try {
@@ -12,8 +13,9 @@ const createQuote = async (req, res, next) => {
 
 const getMyQuotes = async (req, res, next) => {
   try {
-    const quotes = await projectService.getMyQuotes(req.user.id);
-    res.json({ success: true, data: quotes });
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await projectService.getMyQuotes(req.user.id, { limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
   } catch (error) {
     next(error);
   }
@@ -21,8 +23,9 @@ const getMyQuotes = async (req, res, next) => {
 
 const getWorkerQuotes = async (req, res, next) => {
   try {
-    const quotes = await projectService.getWorkerQuotes(req.user.id);
-    res.json({ success: true, data: quotes });
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await projectService.getWorkerQuotes(req.user.id, { limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
   } catch (error) {
     next(error);
   }
@@ -41,8 +44,9 @@ const updateQuoteStatus = async (req, res, next) => {
 
 const getAllQuotes = async (req, res, next) => {
   try {
-    const quotes = await projectService.getAllQuotes();
-    res.json({ success: true, data: quotes });
+    const { page, pageSize, limit, offset } = parsePagination(req.query);
+    const { rows, count } = await projectService.getAllQuotes({ limit, offset });
+    res.json({ success: true, data: rows, pagination: buildMeta({ total: count, page, pageSize }) });
   } catch (error) {
     next(error);
   }

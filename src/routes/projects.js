@@ -10,8 +10,8 @@ const router = Router();
 router.use(authenticate);
 
 // ── Servicios ──────────────────────────────────────────────
-router.get('/services', ctrl.getServices);
-router.get('/services/:id', ctrl.getService);
+// GET /services y /services/:id los sirve routes/services.js (montado antes que
+// este catch-all), así que se removieron de aquí. Solo POST /services es propio.
 router.post('/services', authorize('admin'), [
   body('name').notEmpty().withMessage('Nombre requerido'),
   body('category').isIn(['pintura','enchapes','electricidad','plomeria','obra_gris','carpinteria','impermeabilizacion','otro']).withMessage('Categoría inválida'),
@@ -47,35 +47,15 @@ router.post('/tasks', authorize('admin', 'trabajador', 'cliente'), [
   body('title').notEmpty().withMessage('Título requerido'),
   body('project_id').isUUID().withMessage('ID proyecto inválido'),
 ], ctrl.createTask);
-router.patch('/tasks/:id', ctrl.updateTask);
+// PATCH /tasks/:id lo sirve routes/tasks.js (montado antes); removido de aquí.
 router.patch('/tasks/:id/assign', authorize('admin', 'cliente'), [
   body('worker_id').isUUID().withMessage('ID trabajador inválido'),
 ], ctrl.assignTask);
 
 // ── Cotizaciones / Solicitudes de Servicio ─────────────────
-
-// CLIENTE: Crear solicitud dirigida a un trabajador específico
-router.post('/quotes', authorize('cliente'), [
-  body('service_id').isUUID().withMessage('Servicio inválido'),
-  body('worker_id').isUUID().withMessage('Debes seleccionar un trabajador'),
-  body('city').notEmpty().withMessage('Ciudad requerida'),
-  body('address').notEmpty().withMessage('Dirección requerida'),
-], ctrl.createQuote);
-
-// CLIENTE: Ver mis solicitudes enviadas
-router.get('/quotes/me', authorize('cliente'), ctrl.getMyQuotes);
-
-// TRABAJADOR: Ver solicitudes recibidas
-router.get('/quotes/worker', authorize('trabajador'), ctrl.getWorkerQuotes);
-
-// ADMIN: Ver todas las solicitudes (rol supervisor)
-router.get('/quotes', authorize('admin'), ctrl.getAllQuotes);
-
-// TRABAJADOR + ADMIN: Cambiar estado de una solicitud
-// Trabajador → solo 'aceptada' | 'rechazada' sobre sus propias solicitudes
-// Admin → puede cambiar cualquier estado para supervisión
-router.patch('/quotes/:id/status', authorize('trabajador', 'admin'), [
-  body('status').isIn(['solicitud_pendiente','revisada','aceptada','rechazada','expirada']).withMessage('Estado inválido'),
-], ctrl.updateQuoteStatus);
+// Todo /quotes* lo sirve routes/quotes.js (montado antes que este catch-all),
+// así que las rutas de cotizaciones que había aquí nunca se ejecutaban y se
+// removieron. La lógica de negocio sigue en projectService (que quoteController
+// consume). Ver docs/backend.md#duplicación-de-rutas.
 
 module.exports = router;
