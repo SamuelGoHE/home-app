@@ -53,11 +53,30 @@ export function useChat(projectId, userId) {
       socketRef.current.on('connect', () => {
         // Unirse a la sala del proyecto
         socketRef.current.emit('join_room', projectId)
+        // Al entrar, marcar como leídos los mensajes ya recibidos de la contraparte
+        socketRef.current.emit('mark_read', projectId)
       })
 
       // 3. Escuchar nuevos mensajes
       socketRef.current.on('new_message', (message) => {
         setMessages((prev) => [...prev, message])
+        // Si el mensaje llega de la contraparte y tengo el chat abierto,
+        // lo marco leído de inmediato (dispara su "visto" en tiempo real).
+        const senderId = message.senderId || message.sender_id
+        if (String(senderId) !== String(userId)) {
+          socketRef.current.emit('mark_read', projectId)
+        }
+      })
+
+      // 4. Recibo de lectura: la contraparte leyó mis mensajes → mostrar ✓✓
+      socketRef.current.on('messages_read', ({ readerId }) => {
+        if (String(readerId) === String(userId)) return // el lector fui yo
+        setMessages((prev) =>
+          prev.map((m) => {
+            const senderId = m.senderId || m.sender_id
+            return String(senderId) === String(userId) ? { ...m, read: true } : m
+          })
+        )
       })
     })()
 

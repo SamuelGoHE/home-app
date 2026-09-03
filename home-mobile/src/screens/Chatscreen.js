@@ -5,7 +5,7 @@ import {
     Platform, Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Send } from 'lucide-react-native';
+import { Send, Check, CheckCheck } from 'lucide-react-native';
 import { useAuthStore } from '../context/authStore';
 import { useChat } from '../hooks/useChat';
 import { useProjects } from '../hooks/useApi';
@@ -20,6 +20,7 @@ import { BackButton, IconButton, LoadingState, EmptyState, ErrorState } from '..
 const ICON = {
     brand: '#E8432D',   // = tokens.colors.brand.DEFAULT
     surface: '#ffffff', // = tokens.colors.surface.DEFAULT
+    muted: '#9ca3af',   // gris para el ✓ "enviado" (aún no leído)
 };
 
 /* ══════════════════════════════════════════════════════════════════
@@ -163,10 +164,23 @@ export default function ChatScreen({ route, navigation }) {
                                         </Text>
                                     </View>
 
-                                    {/* Hora */}
-                                    <Text className={`text-[10px] text-muted font-medium mt-1 ${isMine ? 'mr-1' : 'ml-1'}`}>
-                                        {timeLabel}
-                                    </Text>
+                                    {/* Hora + recibo de lectura (solo en mis mensajes) */}
+                                    {isMine ? (
+                                        <View className="flex-row items-center gap-1 mt-1 mr-1">
+                                            <Text className="text-[10px] text-muted font-medium">
+                                                {timeLabel}
+                                            </Text>
+                                            {msg.read ? (
+                                                <CheckCheck size={13} color={ICON.brand} />
+                                            ) : (
+                                                <Check size={13} color={ICON.muted} />
+                                            )}
+                                        </View>
+                                    ) : (
+                                        <Text className="text-[10px] text-muted font-medium mt-1 ml-1">
+                                            {timeLabel}
+                                        </Text>
+                                    )}
                                 </View>
                             );
                         })}

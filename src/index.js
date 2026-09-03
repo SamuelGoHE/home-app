@@ -34,6 +34,7 @@ const app = require('./app');
 const { connectDB } = require('./config/database');
 const { connectRedis } = require('./config/redis');
 const { Message, Project, User } = require('./models');
+const messageService = require('./services/messageService');
 const { verifyAccessToken, isTokenBlacklisted } = require('./utils/jwt');
 
 const PORT = process.env.PORT || 3000;
@@ -129,6 +130,20 @@ io.on('connection', (socket) => {
       });
     } catch (error) {
       console.error('Error al guardar mensaje:', error.message);
+    }
+  });
+
+  // ── Recibo de lectura ("visto") en tiempo real ──
+  // El lector marca como leídos los mensajes de la contraparte y se notifica
+  // a la sala para que el remitente vea el ✓✓ en vivo, sin recargar.
+  socket.on('mark_read', async (roomId) => {
+    try {
+      if (!roomId) return;
+      // markAsRead valida el acceso (lanza si no es participante) antes de tocar la DB.
+      await messageService.markAsRead(roomId, { id: socket.userId, role: socket.userRole });
+      io.to(roomId).emit('messages_read', { projectId: roomId, readerId: socket.userId });
+    } catch (error) {
+      console.error('Error en mark_read:', error.message);
     }
   });
 
