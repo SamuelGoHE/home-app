@@ -38,9 +38,9 @@ No rompen el producto si faltan el día 1, pero un usuario las va a extrañar r�
 ## 🟢 Opcional — vale la pena pero no urgente
 
 19. Convención de nombres consistente en `home-mobile/src/screens/` (cosmético, no afecta funcionamiento).
-20. `.gitattributes` (ya agregado en esta sesión) y `.gitignore` de IDEs (`.vscode/`, `.idea/`).
+20. ✅ `.gitattributes` y `.gitignore` de IDEs (`.vscode/`, `.idea/`, `*.swp`/`*.swo`/`*~`) — añadidos al `.gitignore` raíz (que ya cubría `node_modules`, `.env*`, `coverage/`, `.DS_Store`, `Thumbs.db`).
 21. ✅ Movido `activate_users.js` → `scripts/activate-users.js` con encabezado documentado.
-22. Revisar si `GET /api/workers` se puede eliminar a favor de `GET /api/users/workers`. **Ojo:** el reporte lo daba "sin consumidores", pero `AdminDashboard` (web) **sí** lo consume (`api.get('/workers')`) — no es código muerto todavía; requiere migrar ese consumidor antes de eliminarlo. Es parte del refactor #13.
+22. Revisar si `GET /api/workers` se puede eliminar a favor de `GET /api/users/workers`. **Evaluado (03-sep-2026) → se pospone:** no es un swap trivial. `GET /api/workers` (projectService.getWorkers) devuelve **solo trabajadores activos**, con `phone`, sin paginar, orden por `rating_avg`; `GET /api/users/workers` (userService.searchWorkers) devuelve todos los `role:trabajador` (incl. bloqueados), **sin `phone`**, paginado, con rating recalculado desde la tabla Ratings y orden por nombre/precio. El `AdminDashboard` (web) consume `/workers` — no es código muerto. Migrarlo exige reconciliar esas diferencias (activo-only, `phone`, fuente del rating); payoff bajo, no bloquea beta.
 23. Explorar reemplazar el fetching manual de `useApi.js` por una librería de cache de datos (React Query/SWR) si el volumen de pantallas sigue creciendo — hoy cada hook gestiona su propio estado sin compartir cache.
 
 ## Qué SÍ está listo hoy

@@ -22,3 +22,10 @@ npm-debug.log*
 # Sistema operativo / editor
 .DS_Store
 Thumbs.db
+
+# IDEs / editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
