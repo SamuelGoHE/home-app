@@ -13,6 +13,7 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import api from '../services/api';
+import { buildQuotePayload } from '../utils/quote';
 import { Button, IconButton, BackButton, Card } from '../components/ui';
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
@@ -206,17 +207,10 @@ export default function CalendarScreen({ route, navigation }) {
 
         setLoading(true);
         try {
-            await api.post('/quotes', {
-                service_id: serviceId,
-                worker_id: workerId,
-                city,
-                address,
-                sq_meters: sq_meters ? parseFloat(sq_meters) : null,
-                occupied,
-                notes,
-                start_date: format(startDate, 'yyyy-MM-dd'),
-                end_date: rangeMode && endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
-            });
+            await api.post('/quotes', buildQuotePayload({
+                serviceId, workerId, city, address, sq_meters, occupied, notes,
+                startDate, endDate, rangeMode,
+            }));
 
             // Ir directamente a los proyectos sin alert
             navigation.navigate('ProjectsTab', { screen: 'ProjectsTabScreen' });

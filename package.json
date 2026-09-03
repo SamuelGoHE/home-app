@@ -13,6 +13,13 @@
     "db:migrate:undo:all": "sequelize-cli db:migrate:undo:all",
     "db:seed:services": "sequelize-cli db:seed --seed 20240101000001-initial-services.js"
   },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "<rootDir>/home-mobile/",
+      "<rootDir>/home-frontend/"
+    ]
+  },
   "dependencies": {
     "@sentry/node": "^10.73.0",
     "@supabase/supabase-js": "^2.105.4",

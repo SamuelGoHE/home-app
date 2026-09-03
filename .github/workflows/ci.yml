@@ -44,3 +44,22 @@ jobs:
         run: npm ci
       - name: Build de producción (vite)
         run: npm run build
+
+  mobile:
+    name: Mobile — smoke tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: home-mobile
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: home-mobile/package-lock.json
+      # --legacy-peer-deps: el árbol de Expo tiene conflictos de peers preexistentes.
+      - name: Instalar dependencias
+        run: npm ci --legacy-peer-deps
+      - name: Smoke tests (jest)
+        run: npm test
