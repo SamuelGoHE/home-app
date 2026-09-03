@@ -32,12 +32,13 @@ export default function ChatScreen({ route, navigation }) {
     const { user } = useAuthStore();
 
     const [inputText, setInputText] = useState('');
+    const [sendError, setSendError] = useState(false);
     const scrollRef = useRef(null);
 
     const { data: projects } = useProjects();
     const project = projects?.find(p => String(p.id) === String(projectId));
 
-    const { messages, sendMessage, loading, error, refetch } = useChat(projectId, user?.id);
+    const { messages, sendMessage, notifyTyping, loading, error, refetch, connected, otherTyping } = useChat(projectId, user?.id);
 
     const isClient = user?.role === 'cliente';
     let counterpartyName = 'Chat del Proyecto';
@@ -67,8 +68,20 @@ export default function ChatScreen({ route, navigation }) {
 
     const handleSend = () => {
         if (!inputText.trim()) return;
-        sendMessage(inputText.trim());
-        setInputText('');
+        const sent = sendMessage(inputText.trim());
+        if (sent) {
+            setInputText('');
+            setSendError(false);
+        } else {
+            // Sin conexión: conservamos el texto y avisamos en vez de perderlo.
+            setSendError(true);
+        }
+    };
+
+    const handleChangeText = (t) => {
+        setInputText(t);
+        if (sendError) setSendError(false);
+        notifyTyping();
     };
 
     return (
@@ -98,11 +111,26 @@ export default function ChatScreen({ route, navigation }) {
                         <Text className="text-[15px] font-extrabold text-ink" numberOfLines={1}>
                             {counterpartyName}
                         </Text>
-                        <Text className="text-[12px] text-muted font-medium" numberOfLines={1}>
-                            {project?.service?.name || 'Chat del Proyecto'}
-                        </Text>
+                        {otherTyping ? (
+                            <Text className="text-[12px] text-brand font-semibold" numberOfLines={1}>
+                                escribiendo…
+                            </Text>
+                        ) : (
+                            <Text className="text-[12px] text-muted font-medium" numberOfLines={1}>
+                                {project?.service?.name || 'Chat del Proyecto'}
+                            </Text>
+                        )}
                     </View>
                 </View>
+
+                {/* ── Banner de reconexión ── */}
+                {!connected && (
+                    <View className="bg-amber-100 px-5 py-1.5">
+                        <Text className="text-[11px] text-amber-800 font-semibold text-center">
+                            Sin conexión · reconectando…
+                        </Text>
+                    </View>
+                )}
 
                 {/* ── Mensajes ── */}
                 {loading ? (
@@ -189,10 +217,15 @@ export default function ChatScreen({ route, navigation }) {
 
                 {/* ── Input ── */}
                 <View className="bg-surface border-t border-border px-4 py-3">
+                    {sendError && (
+                        <Text className="text-[11px] text-red-500 font-semibold mb-1.5 ml-2">
+                            No se pudo enviar. Revisa tu conexión e intenta de nuevo.
+                        </Text>
+                    )}
                     <View className="flex-row items-center gap-2 bg-background rounded-full px-2 py-1.5 border border-border">
                         <TextInput
                             value={inputText}
-                            onChangeText={setInputText}
+                            onChangeText={handleChangeText}
                             placeholder="Escribe un mensaje..."
                             placeholderTextColor="#9ca3af"
                             className="flex-1 px-3 text-[14px] text-ink max-h-24"

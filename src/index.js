@@ -147,6 +147,20 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ── Indicador "escribiendo…" ──
+  // Se retransmite a la sala (menos al emisor). El guard `socket.rooms.has`
+  // evita tocar la DB en cada tecleo y bloquea spoofing: solo estás en la
+  // sala si `join_room` ya validó tu acceso.
+  socket.on('typing', (roomId) => {
+    if (!roomId || !socket.rooms.has(roomId)) return;
+    socket.to(roomId).emit('user_typing', { projectId: roomId, userId: socket.userId });
+  });
+
+  socket.on('stop_typing', (roomId) => {
+    if (!roomId || !socket.rooms.has(roomId)) return;
+    socket.to(roomId).emit('user_stop_typing', { projectId: roomId, userId: socket.userId });
+  });
+
   socket.on('disconnect', () => { /* limpieza automática de salas */ });
 });
 
