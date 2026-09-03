@@ -7,6 +7,8 @@ jest.mock('../src/models', () => ({
 
 jest.mock('sequelize', () => ({
   Op: { gte: Symbol('gte') },
+  fn: (name, c) => `${name}(${c})`,
+  col: (c) => c,
 }));
 
 const ratingService = require('../src/services/ratingService');
@@ -123,13 +125,19 @@ describe('ratingService.createRating — permisos y recálculo del promedio', ()
     const workerUpdate = jest.fn();
     User.findOne.mockResolvedValue({ id: 'w-1', role: 'trabajador', update: workerUpdate });
     Rating.create.mockResolvedValue({ id: 'r-nueva', score: 5 });
-    // 5, 4, 4 → promedio 4.333... → 4.3
-    Rating.findAll.mockResolvedValue([{ score: 5 }, { score: 4 }, { score: 4 }]);
+    // La DB agrega: promedio 4.333... (5,4,4) sobre 3 filas → 4.3
+    Rating.findAll.mockResolvedValue([{ avg: '4.3333333', count: '3' }]);
 
     const result = await ratingService.createRating(base, 'c-1');
 
     expect(Rating.create).toHaveBeenCalledWith(expect.objectContaining({
       score: 5, worker_id: 'w-1', project_id: 'p-1', reviewer_id: 'c-1',
+    }));
+    // El recálculo usa AVG/COUNT en la query, no trae las filas a memoria.
+    expect(Rating.findAll).toHaveBeenCalledWith(expect.objectContaining({
+      where: { worker_id: 'w-1' },
+      attributes: [['AVG(score)', 'avg'], ['COUNT(id)', 'count']],
+      raw: true,
     }));
     expect(workerUpdate).toHaveBeenCalledWith({ rating_avg: 4.3, rating_count: 3 });
     expect(result).toEqual({ id: 'r-nueva', score: 5 });

@@ -1,5 +1,5 @@
 const { Rating, User, Project, Service } = require('../models');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 
 // Crear calificación
 const createRating = async ({ score, comment, worker_id, project_id }, reviewerId) => {
@@ -30,12 +30,21 @@ const createRating = async ({ score, comment, worker_id, project_id }, reviewerI
     // Crear la calificación
     const rating = await Rating.create({ score, comment, reviewer_id: reviewerId, worker_id, project_id });
 
-    // Actualizar promedio del trabajador
-    const allRatings = await Rating.findAll({ where: { worker_id } });
-    const avg = allRatings.reduce((sum, r) => sum + r.score, 0) / allRatings.length;
+    // Actualizar promedio del trabajador con una agregación en la DB
+    // (AVG/COUNT en una sola query, en vez de traer todas las filas a memoria).
+    const [stats] = await Rating.findAll({
+        where: { worker_id },
+        attributes: [
+            [fn('AVG', col('score')), 'avg'],
+            [fn('COUNT', col('id')), 'count'],
+        ],
+        raw: true,
+    });
+    const count = parseInt(stats?.count, 10) || 0;
+    const avg = count > 0 ? parseFloat(stats.avg) : 0;
     await worker.update({
         rating_avg: Math.round(avg * 10) / 10,
-        rating_count: allRatings.length,
+        rating_count: count,
     });
 
     return rating;
